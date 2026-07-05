@@ -503,19 +503,35 @@ async function compareAudits() {
 }
 
 async function askAnalyst(questionOverride) {
-  const question = questionOverride || els.analystQuestion.value.trim();
+  const question = typeof questionOverride === "string" ? questionOverride : els.analystQuestion.value.trim();
   if (!state.audit || !question) return;
   state.chat.push({ role: "user", text: question });
   renderChat();
-  const response = await fetch(`/audits/${state.audit.audit_id}/analyst`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question }),
-  });
-  const payload = await response.json();
-  state.chat.push({ role: "assistant", text: payload.answer, source: payload.source, issueIds: payload.supporting_issue_ids });
-  els.analystQuestion.value = "";
-  renderChat();
+  els.askAnalystButton.disabled = true;
+  try {
+    const response = await fetch(`/audits/${state.audit.audit_id}/analyst`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question }),
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      const detail = typeof payload.detail === "string" ? payload.detail : "Analyst could not answer that question.";
+      throw new Error(detail);
+    }
+    state.chat.push({
+      role: "assistant",
+      text: payload.answer || "I could not generate an answer for that question.",
+      source: payload.source,
+      issueIds: payload.supporting_issue_ids,
+    });
+    els.analystQuestion.value = "";
+  } catch (error) {
+    state.chat.push({ role: "assistant", text: error.message || "Analyst request failed." });
+  } finally {
+    els.askAnalystButton.disabled = state.busy;
+    renderChat();
+  }
 }
 
 function renderChat() {
