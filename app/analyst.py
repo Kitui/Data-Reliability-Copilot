@@ -28,17 +28,16 @@ def answer_question(
 
     if is_score_improvement_question(lowered):
         answer = build_score_improvement_answer(audit)
+    elif is_risk_question(lowered):
+        answer = build_risk_answer(audit, lowered)
     elif is_report_question(lowered):
         answer = build_report_answer(audit)
     elif "fix" in lowered or "clean" in lowered or "remed" in lowered:
         answer = build_fix_answer(audit)
     elif "manager" in lowered or "executive" in lowered or "summary" in lowered:
         answer = audit.summary.executive_summary
-    elif "ml" in lowered or "model" in lowered or "training" in lowered:
-        answer = (
-            "For ML use, treat PII, duplicate entity keys, high-cardinality identifiers, missing target-like fields, "
-            "and outliers as blockers or warnings before training."
-        )
+    elif is_ml_question(lowered):
+        answer = build_ml_answer(audit)
     elif "rule" in lowered or "contract" in lowered:
         answer = (
             "Generate a data contract from this audit, then tighten required columns, unique keys, allowed values, "
@@ -72,6 +71,26 @@ def is_report_question(lowered: str) -> bool:
     )
 
 
+def is_ml_question(lowered: str) -> bool:
+    return any(
+        phrase in lowered
+        for phrase in [
+            "ml",
+            "model",
+            "training",
+            "machine learning",
+            "prediction",
+            "predictive",
+            "ai model",
+            "segmentation",
+        ]
+    )
+
+
+def is_risk_question(lowered: str) -> bool:
+    return "risk" in lowered or "safest" in lowered or "least severe" in lowered or "lowest severity" in lowered
+
+
 def build_score_improvement_answer(audit: AuditResult) -> str:
     top_issues = sorted(
         audit.issues,
@@ -85,6 +104,33 @@ def build_score_improvement_answer(audit: AuditResult) -> str:
         "Recommended order: "
         + " ".join(actions)
         + " After fixing, rerun the audit and compare the new score against this baseline."
+    )
+
+
+def build_risk_answer(audit: AuditResult, lowered: str) -> str:
+    ordered = sorted(
+        audit.issues,
+        key=lambda issue: (severity_rank(issue.severity), issue.affected_rate, issue.confidence),
+    )
+    issue = ordered[0] if "least" in lowered or "lowest" in lowered or "safest" in lowered else ordered[-1]
+    direction = "least risky" if issue == ordered[0] else "highest-risk"
+    return (
+        f"The {direction} issue is {issue.id}: {issue.title}. It is rated {issue.severity}, affects "
+        f"{issue.affected_rows} rows ({issue.affected_rate:.0%}), and relates to {', '.join(issue.columns)}. "
+        f"Recommendation: {issue.recommendation}"
+    )
+
+
+def build_ml_answer(audit: AuditResult) -> str:
+    readiness = assess_ml_readiness(audit)
+    blockers = " ".join(f"- {item}" for item in readiness.blockers) or "- No hard blockers detected."
+    warnings = " ".join(f"- {item}" for item in readiness.warnings[:4]) or "- No major warnings detected."
+    unsuitable = ", ".join(readiness.unsuitable_features) or "none flagged"
+    return (
+        f"Use this dataset for machine learning only after remediation. ML readiness is {readiness.score}/100 "
+        f"with {readiness.risk_level} risk. Blockers: {blockers} Warnings: {warnings} "
+        f"Features to exclude or protect before modeling: {unsuitable}. "
+        "Rerun the audit after deduplication, validation, and PII handling."
     )
 
 

@@ -240,6 +240,28 @@ def test_analyst_gives_distinct_answers_for_score_and_report_questions() -> None
     assert "Report this dataset as" in report_answer.answer
 
 
+def test_analyst_answers_machine_learning_phrase_without_llm() -> None:
+    frame = read_csv_path(Path("samples/customers_dirty.csv"))
+    result = audit_dataframe(frame, "customers_dirty.csv")
+
+    answer = answer_question(result, "Can I use it for machine learning?")
+
+    assert "ML readiness" in answer.answer
+    assert "Use this dataset for machine learning only after remediation" in answer.answer
+    assert "customer_id" in answer.answer
+
+
+def test_analyst_answers_least_risk_issue_question_without_llm() -> None:
+    frame = read_csv_path(Path("samples/customers_dirty.csv"))
+    result = audit_dataframe(frame, "customers_dirty.csv")
+
+    answer = answer_question(result, "What is the least risk issue with this dataset?")
+
+    assert "least risky issue" in answer.answer
+    assert "rated low" in answer.answer
+    assert "DQ-010" in answer.answer
+
+
 def test_analyst_can_use_llm_when_configured(monkeypatch: pytest.MonkeyPatch) -> None:
     frame = read_csv_path(Path("samples/customers_dirty.csv"))
     result = audit_dataframe(frame, "customers_dirty.csv")
