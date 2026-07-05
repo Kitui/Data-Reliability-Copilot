@@ -737,7 +737,7 @@ tr.selected {
 
 .column-card {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 12px;
@@ -755,17 +755,103 @@ tr.selected {
 }
 
 .column-main {
-  display: grid;
-  gap: 3px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
   padding: 0;
   background: transparent;
   color: #172026;
   text-align: left;
 }
 
+.column-main span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.column-main strong {
+  overflow-wrap: anywhere;
+}
+
+.column-main small {
+  color: #65737e;
+}
+
 .column-main:hover {
   background: transparent;
   color: #116466;
+}
+
+.column-health {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.health-good {
+  background: rgba(123, 198, 164, 0.18);
+  color: #23543e;
+}
+
+.health-watch {
+  background: rgba(237, 174, 73, 0.18);
+  color: #815f12;
+}
+
+.health-risk {
+  background: rgba(231, 101, 79, 0.16);
+  color: #9a3324;
+}
+
+.column-metrics {
+  display: grid;
+  gap: 10px;
+}
+
+.column-metric {
+  display: grid;
+  gap: 5px;
+}
+
+.column-metric span {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+  color: #344249;
+}
+
+.column-metric b {
+  font-weight: 700;
+}
+
+.column-metric em {
+  color: #172026;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.column-metric small {
+  color: #65737e;
+}
+
+.column-card .bar {
+  height: 8px;
+  overflow: hidden;
+}
+
+.column-card .risk-bar i {
+  background: linear-gradient(90deg, var(--coral), var(--amber));
+}
+
+.column-card .unique-bar i {
+  background: linear-gradient(90deg, var(--amber), var(--teal));
 }
 
 .rule-builder {

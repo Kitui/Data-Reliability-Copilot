@@ -302,15 +302,32 @@ function renderColumns() {
   grid.innerHTML = "";
   state.audit.profile.columns.forEach((column) => {
     const related = state.audit.issues.filter((issue) => issue.columns.includes(column.name));
+    const missingPct = Math.round(column.missing_rate * 100);
+    const uniquePct = Math.round(column.unique_rate * 100);
+    const missingCount = column.missing_count || 0;
+    const health = columnHealth(column, related);
     const card = document.createElement("article");
     card.className = `column-card ${state.selectedColumn === column.name ? "selected" : ""}`;
     card.innerHTML = `
       <button class="column-main" data-open-column="${escapeHtml(column.name)}">
-        <strong>${escapeHtml(column.name)}</strong>
-        <span>${escapeHtml(column.inferred_type)} - ${related.length} signals</span>
+        <span>
+          <strong>${escapeHtml(column.name)}</strong>
+          <small>${escapeHtml(column.inferred_type)} - ${related.length} signal${related.length === 1 ? "" : "s"}</small>
+        </span>
+        <em class="column-health health-${health.level}">${escapeHtml(health.label)}</em>
       </button>
-      <label>Missing <div class="bar"><i style="width:${Math.round(column.missing_rate * 100)}%"></i></div></label>
-      <label>Unique <div class="bar"><i style="width:${Math.round(column.unique_rate * 100)}%"></i></div></label>
+      <div class="column-metrics">
+        <div class="column-metric">
+          <span><b>Missing</b><em>${missingPct}%</em></span>
+          <div class="bar risk-bar"><i style="width:${missingPct}%"></i></div>
+          <small>${missingCount.toLocaleString()} blank value${missingCount === 1 ? "" : "s"}</small>
+        </div>
+        <div class="column-metric">
+          <span><b>Unique</b><em>${uniquePct}%</em></span>
+          <div class="bar unique-bar"><i style="width:${uniquePct}%"></i></div>
+          <small>${column.unique_count.toLocaleString()} distinct value${column.unique_count === 1 ? "" : "s"}</small>
+        </div>
+      </div>
       <div class="chip-row">
         <button data-rule-add="required" data-column="${escapeHtml(column.name)}">Required</button>
         <button data-rule-add="unique" data-column="${escapeHtml(column.name)}">Unique</button>
@@ -331,6 +348,13 @@ function renderColumns() {
   document.querySelectorAll("[data-rule-add]").forEach((button) => {
     button.addEventListener("click", () => addColumnRule(button.dataset.ruleAdd, button.dataset.column));
   });
+}
+
+function columnHealth(column, related) {
+  const hasHighIssue = related.some((issue) => ["critical", "high"].includes(issue.severity));
+  if (hasHighIssue || column.missing_rate >= 0.25) return { level: "risk", label: "Needs review" };
+  if (column.missing_rate > 0 || related.length) return { level: "watch", label: "Watch" };
+  return { level: "good", label: "Clean" };
 }
 
 function renderInspector() {
