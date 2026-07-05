@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Data Reliability Copilot</title>
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="left-rail">
+        <section class="brand-block">
+          <p class="eyebrow">Data Reliability Copilot</p>
+          <h1>Data workbench</h1>
+        </section>
+
+        <section class="upload-card">
+          <div class="segmented">
+            <button class="segment active" data-rule-mode="builder">Builder</button>
+            <button class="segment" data-rule-mode="json">JSON</button>
+          </div>
+          <input id="fileInput" type="file" accept=".csv">
+          <button id="uploadButton">Upload CSV</button>
+          <button id="sampleButton" class="secondary-button">Run sample</button>
+          <span id="status">Ready</span>
+        </section>
+
+        <section class="rail-card">
+          <div class="panel-heading">
+            <h2>Audits</h2>
+            <button id="refreshHistoryButton" class="icon-button" title="Refresh audits">Refresh</button>
+          </div>
+          <div id="history" class="history-list"></div>
+        </section>
+
+        <section class="rail-card">
+          <h2>Saved Contract</h2>
+          <div id="contractMini" class="mini-list"></div>
+        </section>
+      </aside>
+
+      <section class="main-stage">
+        <header class="command-bar">
+          <div>
+            <p id="currentDataset" class="eyebrow">No dataset selected</p>
+            <h2 id="currentTitle">Upload or run a sample audit</h2>
+          </div>
+          <div class="top-actions">
+            <button id="regenerateButton" class="secondary-button">Regenerate AI</button>
+            <a id="reportLink" class="button-link hidden" href="#" target="_blank" rel="noreferrer">Export report</a>
+          </div>
+        </header>
+
+        <section id="emptyState" class="empty-state">
+          <div>
+            <h2>Start with a dataset</h2>
+            <p>Upload a CSV, run the sample, or configure rules to turn this into a remediation and governance workspace.</p>
+            <div class="quick-start">
+              <button id="emptySampleButton">Run sample audit</button>
+              <button id="emptyRulesButton" class="secondary-button">Open rule builder</button>
+            </div>
+          </div>
+        </section>
+
+        <section id="workbench" class="hidden">
+          <section class="score-grid">
+            <button class="score-card" data-score-filter="all">
+              <span>Overall</span>
+              <strong id="score">--</strong>
+              <small id="risk">--</small>
+            </button>
+            <button class="score-card" data-score-filter="completeness">
+              <span>Completeness</span>
+              <strong id="scoreCompleteness">--</strong>
+              <div class="meter"><i id="meterCompleteness"></i></div>
+            </button>
+            <button class="score-card" data-score-filter="validity">
+              <span>Validity</span>
+              <strong id="scoreValidity">--</strong>
+              <div class="meter"><i id="meterValidity"></i></div>
+            </button>
+            <button class="score-card" data-score-filter="all">
+              <span>Issues</span>
+              <strong id="issueCount">--</strong>
+              <small>visible / total</small>
+            </button>
+            <button class="score-card" data-score-filter="privacy">
+              <span>Privacy</span>
+              <strong id="privacyCount">--</strong>
+              <small>sensitive fields</small>
+            </button>
+            <button class="score-card" data-score-filter="uniqueness">
+              <span>Uniqueness</span>
+              <strong id="scoreUniqueness">--</strong>
+              <div class="meter"><i id="meterUniqueness"></i></div>
+            </button>
+          </section>
+
+          <nav class="tabs" aria-label="Workbench tabs">
+            <button class="tab active" data-tab="overview">Overview</button>
+            <button class="tab" data-tab="issues">Issues</button>
+            <button class="tab" data-tab="columns">Columns</button>
+            <button class="tab" data-tab="rules">Rules</button>
+            <button class="tab" data-tab="remediation">Remediation</button>
+            <button class="tab" data-tab="contract">Contract</button>
+            <button class="tab" data-tab="compare">Compare</button>
+            <button class="tab" data-tab="analyst">Analyst</button>
+          </nav>
+
+          <section class="content-layout">
+            <section class="center-pane">
+              <section id="tab-overview" class="tab-panel active">
+                <div class="panel">
+                  <div class="panel-heading">
+                    <h2>Executive Summary</h2>
+                    <span id="summarySource" class="chip">--</span>
+                  </div>
+                  <p id="summaryText"></p>
+                  <div class="summary-grid">
+                    <div>
+                      <h3>Recommended Focus</h3>
+                      <ul id="focusList"></ul>
+                    </div>
+                    <div>
+                      <h3>Remediation Plan</h3>
+                      <ul id="remediationList"></ul>
+                    </div>
+                  </div>
+                </div>
+                <div class="panel">
+                  <h2>Quality Dimensions</h2>
+                  <div id="scoreBreakdown" class="dimension-grid"></div>
+                </div>
+              </section>
+
+              <section id="tab-issues" class="tab-panel">
+                <div class="toolbar">
+                  <input id="issueSearch" type="search" placeholder="Search issues, columns, recommendations">
+                  <select id="severityFilter"><option value="all">All severities</option></select>
+                  <select id="categoryFilter"><option value="all">All categories</option></select>
+                  <select id="statusFilter"><option value="all">All statuses</option></select>
+                </div>
+                <div class="bulk-bar">
+                  <span id="selectionCount">0 selected</span>
+                  <button data-bulk-status="fixed" class="secondary-button">Mark fixed</button>
+                  <button data-bulk-status="in_progress" class="secondary-button">Mark in progress</button>
+                  <button data-bulk-status="accepted_risk" class="secondary-button">Accept risk</button>
+                </div>
+                <div class="table-wrap">
+                  <table class="issue-table">
+                    <thead>
+                      <tr>
+                        <th><input id="selectAllIssues" type="checkbox"></th>
+                        <th>Issue</th>
+                        <th>Severity</th>
+                        <th>Category</th>
+                        <th>Status</th>
+                        <th>Affected</th>
+                        <th>Confidence</th>
+                      </tr>
+                    </thead>
+                    <tbody id="issueTableBody"></tbody>
+                  </table>
+                </div>
+              </section>
+
+              <section id="tab-columns" class="tab-panel">
+                <div class="panel">
+                  <h2>Column Explorer</h2>
+                  <div id="columnGrid" class="column-grid"></div>
+                </div>
+              </section>
+
+              <section id="tab-rules" class="tab-panel">
+                <div class="panel">
+                  <div class="panel-heading">
+                    <h2>Rule Builder</h2>
+                    <button id="syncRulesButton" class="secondary-button">Sync JSON</button>
+                  </div>
+                  <div class="rule-builder">
+                    <label>Required columns<textarea id="requiredColumnsInput" rows="2" placeholder="customer_id, email, status"></textarea></label>
+                    <label>Unique keys<textarea id="uniqueColumnsInput" rows="2" placeholder="customer_id"></textarea></label>
+                    <label>Allowed values<textarea id="allowedValuesInput" rows="4" placeholder="status=Active,Inactive&#10;country=Kenya,Uganda"></textarea></label>
+                    <label>Numeric ranges<textarea id="numericRangesInput" rows="3" placeholder="monthly_spend=0:1000"></textarea></label>
+                    <label>Date ranges<textarea id="dateRangesInput" rows="3" placeholder="signup_date=2020-01-01:today"></textarea></label>
+                    <label>Freshness<textarea id="freshnessInput" rows="3" placeholder="updated_at=365"></textarea></label>
+                  </div>
+                  <textarea id="rulesInput" rows="8" spellcheck="false" placeholder='{"required_columns":["customer_id"],"unique_columns":["customer_id"]}'></textarea>
+                </div>
+              </section>
+
+              <section id="tab-remediation" class="tab-panel">
+                <div class="panel">
+                  <div class="panel-heading">
+                    <h2>Remediation Playground</h2>
+                    <div class="inline-actions">
+                      <button id="loadRemediationButton" class="secondary-button">Refresh</button>
+                      <button id="copyScriptButton" class="secondary-button">Copy script</button>
+                    </div>
+                  </div>
+                  <div id="remediationActions" class="action-list"></div>
+                  <h3>Selected Cleaning Script</h3>
+                  <pre id="cleaningScript"></pre>
+                </div>
+              </section>
+
+              <section id="tab-contract" class="tab-panel">
+                <div class="panel">
+                  <div class="panel-heading">
+                    <h2>Data Contract</h2>
+                    <div class="inline-actions">
+                      <button id="loadContractButton" class="secondary-button">Generate</button>
+                      <button id="useContractButton" class="secondary-button">Use as rules</button>
+                    </div>
+                  </div>
+                  <pre id="contractOutput"></pre>
+                </div>
+              </section>
+
+              <section id="tab-compare" class="tab-panel">
+                <div class="panel">
+                  <div class="compare-bar">
+                    <select id="baselineSelect"></select>
+                    <button id="compareButton">Compare</button>
+                  </div>
+                  <div id="comparisonOutput" class="comparison-panel"></div>
+                </div>
+              </section>
+
+              <section id="tab-analyst" class="tab-panel">
+                <div class="panel">
+                  <div id="promptChips" class="prompt-chips"></div>
+                  <div id="chatThread" class="chat-thread"></div>
+                  <div class="analyst-bar">
+                    <input id="analystQuestion" type="text" placeholder="Ask about fixes, ML readiness, rules, or executive summary">
+                    <button id="askAnalystButton">Ask</button>
+                  </div>
+                </div>
+              </section>
+            </section>
+
+            <aside class="inspector-pane">
+              <div class="panel sticky-panel">
+                <div class="panel-heading">
+                  <h2>Inspector</h2>
+                  <span id="inspectorKind" class="chip">context</span>
+                </div>
+                <div id="inspectorContent" class="inspector-content"></div>
+              </div>
+            </aside>
+          </section>
+        </section>
+      </section>
+    </main>
+    <script src="/static/app.js"></script>
+  </body>
+</html>

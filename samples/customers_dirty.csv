@@ -1,0 +1,11 @@
+customer_id,name,email,phone,signup_date,country,status,monthly_spend
+C001,Amina Hassan,amina@example.com,+254711222333,2025-01-10,Kenya,Active,48.5
+C002,Brian Otieno,brian.example.com,0711222333,2025-01-12,Kenya,active,51.0
+C003,Carol Mwangi,carol@example.com,+254722333444,2025-02-01,Kenya,Active,49.0
+C004,David Kimani,david@example,+254733444555,2025-02-03,Kenya,Inactive,12.2
+C005,Eunice Wanjiku,,bad-phone,2025-02-05,Kenya,Inactive,13.1
+C006,Fatuma Ali,fatuma@example.com,+254744555666,2025-02-06,Kenya,Active,52.4
+C006,Fatuma Ali,fatuma@example.com,+254744555666,2025-02-06,Kenya,Active,52.4
+C007,George Kariuki,george@example.com,+254755666777,2025-02-08,Kenya,ACTIVE,5000
+C008,Hellen Njeri,hellen@example.com,+254766777888,,Kenya,Active,47.8
+C009,Ian Mutua,ian@example.com,+254777888999,2025-02-12,Kenya,Active,50.2
