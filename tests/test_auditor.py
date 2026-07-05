@@ -8,7 +8,7 @@ from app.comparison import compare_audits
 from app.contracts import contract_to_rule_config, generate_contract
 from app.ingestion import read_csv_path
 from app.ml_readiness import assess_ml_readiness
-from app.reports import build_markdown_report
+from app.reports import build_html_report, build_markdown_report
 from app.remediation import build_remediation_plan
 from app.schemas import AuditRuleConfig, LlmAuditSummary, UploadedFileInfo
 from app.storage import AuditStore
@@ -129,6 +129,17 @@ def test_markdown_report_contains_summary_and_issues() -> None:
 
     assert "# Data Quality Audit: customers_dirty.csv" in report
     assert "## Score Breakdown" in report
+    assert "Duplicate rows detected" in report
+
+
+def test_html_report_explains_score_breakdown() -> None:
+    frame = read_csv_path(Path("samples/customers_dirty.csv"))
+    result = audit_dataframe(frame, "customers_dirty.csv")
+
+    report = build_html_report(result)
+
+    assert "<!doctype html>" in report
+    assert "How much required data is present instead of blank." in report
     assert "Duplicate rows detected" in report
 
 

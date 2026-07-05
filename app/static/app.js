@@ -173,7 +173,7 @@ function renderAudit(audit) {
   els.emptyState.classList.add("hidden");
   els.workbench.classList.remove("hidden");
   els.reportLink.classList.remove("hidden");
-  els.reportLink.href = `/audits/${audit.audit_id}/report.md`;
+  els.reportLink.href = `/audits/${audit.audit_id}/report.html`;
 
   document.querySelector("#currentDataset").textContent = audit.dataset_name;
   document.querySelector("#currentTitle").textContent = `${audit.score.overall}/100 quality score - ${audit.summary.risk_level} risk`;

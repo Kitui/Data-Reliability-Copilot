@@ -16,7 +16,7 @@ from app.comparison import compare_audits
 from app.contracts import generate_contract
 from app.ingestion import IngestionError, read_csv_bytes, read_csv_path
 from app.ml_readiness import assess_ml_readiness
-from app.reports import build_markdown_report
+from app.reports import build_html_report, build_markdown_report
 from app.remediation import build_remediation_plan
 from app.schemas import (
     AnalystAnswer,
@@ -159,6 +159,11 @@ def get_report(audit_id: str) -> dict[str, object]:
 @app.get("/audits/{audit_id}/report.md", response_class=PlainTextResponse)
 def get_markdown_report(audit_id: str) -> str:
     return build_markdown_report(load_audit(audit_id))
+
+
+@app.get("/audits/{audit_id}/report.html", response_class=HTMLResponse)
+def get_html_report(audit_id: str) -> str:
+    return build_html_report(load_audit(audit_id))
 
 
 @app.get("/audits/{audit_id}/remediation", response_model=RemediationPlan)
