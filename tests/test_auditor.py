@@ -228,6 +228,18 @@ def test_analyst_answers_direct_column_stat_question() -> None:
     assert "DQ-009" in answer.supporting_issue_ids
 
 
+def test_analyst_gives_distinct_answers_for_score_and_report_questions() -> None:
+    frame = read_csv_path(Path("samples/customers_dirty.csv"))
+    result = audit_dataframe(frame, "customers_dirty.csv")
+
+    improve_answer = answer_question(result, "How can I improve this data to a quality score of 100?")
+    report_answer = answer_question(result, "What can I report about this data?")
+
+    assert improve_answer.answer != report_answer.answer
+    assert "move from 63/100 toward 100" in improve_answer.answer
+    assert "Report this dataset as" in report_answer.answer
+
+
 def test_analyst_can_use_llm_when_configured(monkeypatch: pytest.MonkeyPatch) -> None:
     frame = read_csv_path(Path("samples/customers_dirty.csv"))
     result = audit_dataframe(frame, "customers_dirty.csv")

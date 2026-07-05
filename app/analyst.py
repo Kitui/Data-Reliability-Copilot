@@ -19,11 +19,12 @@ def answer_question(audit: AuditResult, question: str) -> AnalystAnswer:
     lowered = question.lower()
     supporting = [issue.id for issue in audit.issues[:5]]
 
-    if "fix" in lowered or "clean" in lowered or "remed" in lowered:
-        answer = (
-            "Start with the highest-severity issues: deduplicate likely keys, correct invalid contact fields, "
-            "then handle missing values and outliers. Use the remediation tab for draft Pandas and SQL actions."
-        )
+    if is_score_improvement_question(lowered):
+        answer = build_score_improvement_answer(audit)
+    elif is_report_question(lowered):
+        answer = build_report_answer(audit)
+    elif "fix" in lowered or "clean" in lowered or "remed" in lowered:
+        answer = build_fix_answer(audit)
     elif "manager" in lowered or "executive" in lowered or "summary" in lowered:
         answer = audit.summary.executive_summary
     elif "ml" in lowered or "model" in lowered or "training" in lowered:
@@ -40,7 +41,8 @@ def answer_question(audit: AuditResult, question: str) -> AnalystAnswer:
         top = "; ".join(f"{issue.title} ({issue.severity})" for issue in audit.issues[:3])
         answer = (
             f"This audit has score {audit.score.overall}/100 with {len(audit.issues)} issues. "
-            f"The most important items are: {top}."
+            f"The most important items are: {top}. Ask about a specific column, score, report, ML readiness, "
+            "contract rules, or remediation plan for a more targeted answer."
         )
 
     return AnalystAnswer(
@@ -49,6 +51,61 @@ def answer_question(audit: AuditResult, question: str) -> AnalystAnswer:
         answer=answer,
         supporting_issue_ids=supporting,
     )
+
+
+def is_score_improvement_question(lowered: str) -> bool:
+    return any(word in lowered for word in ["improve", "increase", "raise", "better", "boost"]) and any(
+        word in lowered for word in ["score", "quality", "100"]
+    )
+
+
+def is_report_question(lowered: str) -> bool:
+    return any(word in lowered for word in ["report", "tell", "present", "share"]) and any(
+        word in lowered for word in ["data", "dataset", "audit", "manager", "stakeholder"]
+    )
+
+
+def build_score_improvement_answer(audit: AuditResult) -> str:
+    top_issues = sorted(
+        audit.issues,
+        key=lambda issue: (severity_rank(issue.severity), issue.affected_rate, issue.confidence),
+        reverse=True,
+    )[:5]
+    actions = [f"{index}. {issue.recommendation}" for index, issue in enumerate(top_issues, start=1)]
+    blockers = "; ".join(f"{issue.id} {issue.title}" for issue in top_issues[:3])
+    return (
+        f"To move from {audit.score.overall}/100 toward 100, fix the highest-impact issues first: {blockers}. "
+        "Recommended order: "
+        + " ".join(actions)
+        + " After fixing, rerun the audit and compare the new score against this baseline."
+    )
+
+
+def build_report_answer(audit: AuditResult) -> str:
+    high_count = sum(1 for issue in audit.issues if issue.severity in {"critical", "high"})
+    categories = sorted({issue.category for issue in audit.issues})
+    focus = " ".join(f"- {item}" for item in audit.summary.recommended_focus[:3])
+    return (
+        f"Report this dataset as {audit.summary.risk_level} risk with a {audit.score.overall}/100 quality score. "
+        f"It has {len(audit.issues)} detected issues, including {high_count} high-priority items. "
+        f"The main affected quality areas are: {', '.join(categories)}. "
+        f"Executive summary: {audit.summary.executive_summary} "
+        f"Recommended talking points: {focus}"
+    )
+
+
+def build_fix_answer(audit: AuditResult) -> str:
+    top_issues = audit.issues[:3]
+    issue_text = "; ".join(f"{issue.id} {issue.title}" for issue in top_issues)
+    return (
+        f"Start with these highest-priority issues: {issue_text}. "
+        "Deduplicate likely keys first, correct invalid contact fields, then handle missing values and outliers. "
+        "Use the remediation tab for draft Pandas and SQL actions."
+    )
+
+
+def severity_rank(severity: str) -> int:
+    return {"low": 1, "medium": 2, "high": 3, "critical": 4}.get(severity, 0)
 
 
 def answer_profile_question(audit: AuditResult, question: str) -> AnalystAnswer | None:
