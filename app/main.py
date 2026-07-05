@@ -188,7 +188,7 @@ def compare_saved_audits(baseline_audit_id: str, candidate_audit_id: str) -> Aud
 
 @app.post("/audits/{audit_id}/analyst", response_model=AnalystAnswer)
 def ask_analyst(audit_id: str, question: AnalystQuestion) -> AnalystAnswer:
-    return jsonable_encoder(answer_question(load_audit(audit_id), question.question))
+    return jsonable_encoder(answer_question(load_audit(audit_id), question.question, question.history))
 
 
 @app.post("/audits/{audit_id}/summary/regenerate", response_model=AuditResult)

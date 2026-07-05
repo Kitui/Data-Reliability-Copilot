@@ -512,7 +512,7 @@ async function askAnalyst(questionOverride) {
     const response = await fetch(`/audits/${state.audit.audit_id}/analyst`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question }),
+      body: JSON.stringify({ question, history: analystHistory() }),
     });
     const payload = await response.json();
     if (!response.ok) {
@@ -532,6 +532,14 @@ async function askAnalyst(questionOverride) {
     els.askAnalystButton.disabled = state.busy;
     renderChat();
   }
+}
+
+function analystHistory() {
+  return state.chat
+    .slice(0, -1)
+    .slice(-8)
+    .filter((message) => message.role === "user" || message.role === "assistant")
+    .map((message) => ({ role: message.role, text: message.text }));
 }
 
 function renderChat() {

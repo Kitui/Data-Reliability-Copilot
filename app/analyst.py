@@ -3,16 +3,23 @@ from __future__ import annotations
 import json
 import os
 
-from app.schemas import AnalystAnswer, AuditResult
+from app.contracts import generate_contract
+from app.ml_readiness import assess_ml_readiness
+from app.remediation import build_remediation_plan
+from app.schemas import AnalystAnswer, AnalystChatMessage, AuditResult
 from app.summaries import build_llm_context
 
 
-def answer_question(audit: AuditResult, question: str) -> AnalystAnswer:
+def answer_question(
+    audit: AuditResult,
+    question: str,
+    history: list[AnalystChatMessage] | None = None,
+) -> AnalystAnswer:
     profile_answer = answer_profile_question(audit, question)
     if profile_answer is not None:
         return profile_answer
 
-    llm_answer = generate_llm_answer(audit, question)
+    llm_answer = generate_llm_answer(audit, question, history or [])
     if llm_answer is not None:
         return llm_answer
 
@@ -195,7 +202,11 @@ def format_stat(value: object) -> str:
     return str(value)
 
 
-def generate_llm_answer(audit: AuditResult, question: str) -> AnalystAnswer | None:
+def generate_llm_answer(
+    audit: AuditResult,
+    question: str,
+    history: list[AnalystChatMessage],
+) -> AnalystAnswer | None:
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         return None
@@ -205,32 +216,42 @@ def generate_llm_answer(audit: AuditResult, question: str) -> AnalystAnswer | No
     except ImportError:
         return None
 
-    context = build_llm_context(audit.profile, audit.issues, audit.score)
+    context = build_analyst_context(audit)
     prompt = (
         "You are a senior data quality analyst inside Data Reliability Copilot. "
-        "Answer the user's question using only the supplied deterministic audit context. "
-        "Do not invent columns, row counts, values, examples, or issues. "
-        "Do not request or reveal raw row data. If the audit context is not enough, say what is missing. "
-        "Keep the answer practical, specific, and concise for a business or data team user."
+        "Answer each user question freshly and specifically using only the supplied deterministic audit context. "
+        "Use the conversation history for references such as 'that column' or 'the previous issue'. "
+        "Do not invent columns, row counts, values, examples, issues, or business facts. "
+        "Do not request, reveal, or pretend to inspect raw row data. "
+        "If exact aggregate values are available, cite them. If context is insufficient, say exactly what is missing. "
+        "Keep answers practical, conversational, and specific to this dataset."
+    )
+    messages = [{"role": "system", "content": prompt}]
+    messages.extend(
+        {
+            "role": message.role,
+            "content": message.text,
+        }
+        for message in history[-8:]
+    )
+    messages.append(
+        {
+            "role": "user",
+            "content": json.dumps(
+                {
+                    "question": question,
+                    "audit_context": context,
+                },
+                separators=(",", ":"),
+            ),
+        }
     )
 
     try:
         client = OpenAI(api_key=api_key)
         response = client.chat.completions.create(
             model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
-            messages=[
-                {"role": "system", "content": prompt},
-                {
-                    "role": "user",
-                    "content": json.dumps(
-                        {
-                            "question": question,
-                            "audit_context": context,
-                        },
-                        separators=(",", ":"),
-                    ),
-                },
-            ],
+            messages=messages,
             temperature=0.2,
         )
         answer = response.choices[0].message.content
@@ -245,3 +266,38 @@ def generate_llm_answer(audit: AuditResult, question: str) -> AnalystAnswer | No
         )
     except Exception:
         return None
+
+
+def build_analyst_context(audit: AuditResult) -> dict[str, object]:
+    remediation = build_remediation_plan(audit)
+    contract = generate_contract(audit)
+    ml_readiness = assess_ml_readiness(audit)
+    base_context = build_llm_context(audit.profile, audit.issues, audit.score)
+    return {
+        **base_context,
+        "dataset_name": audit.dataset_name,
+        "created_at": audit.created_at.isoformat(),
+        "summary": {
+            "executive_summary": audit.summary.executive_summary,
+            "recommended_focus": audit.summary.recommended_focus,
+            "risk_level": audit.summary.risk_level,
+            "notable_patterns": audit.summary.notable_patterns,
+            "remediation_plan": audit.summary.remediation_plan,
+        },
+        "rule_config": audit.rule_config.model_dump(mode="json"),
+        "remediation_actions": [
+            {
+                "issue_id": action.issue_id,
+                "title": action.title,
+                "action_type": action.action_type,
+                "description": action.description,
+                "risk": action.risk,
+                "requires_review": action.requires_review,
+                "sql_hint": action.sql_hint,
+                "pandas_code": action.pandas_code,
+            }
+            for action in remediation.actions
+        ],
+        "data_contract": contract.model_dump(mode="json"),
+        "ml_readiness": ml_readiness.model_dump(mode="json"),
+    }

@@ -212,8 +212,14 @@ class MlReadiness(BaseModel):
     unsuitable_features: list[str]
 
 
+class AnalystChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    text: str = Field(min_length=1, max_length=2000)
+
+
 class AnalystQuestion(BaseModel):
     question: str = Field(min_length=3, max_length=500)
+    history: list[AnalystChatMessage] = Field(default_factory=list, max_length=12)
 
 
 class AnalystAnswer(BaseModel):

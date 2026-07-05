@@ -12,7 +12,7 @@ from app.ingestion import read_csv_path
 from app.ml_readiness import assess_ml_readiness
 from app.reports import build_html_report, build_markdown_report
 from app.remediation import build_remediation_plan
-from app.schemas import AuditRuleConfig, LlmAuditSummary, UploadedFileInfo
+from app.schemas import AnalystChatMessage, AuditRuleConfig, LlmAuditSummary, UploadedFileInfo
 from app.storage import AuditStore
 from app.summaries import build_llm_context
 
@@ -264,3 +264,47 @@ def test_analyst_can_use_llm_when_configured(monkeypatch: pytest.MonkeyPatch) ->
     assert answer.source == "llm"
     assert "duplicate customer IDs" in answer.answer
     assert answer.supporting_issue_ids
+
+
+def test_analyst_llm_receives_history_and_rich_context(monkeypatch: pytest.MonkeyPatch) -> None:
+    frame = read_csv_path(Path("samples/customers_dirty.csv"))
+    result = audit_dataframe(frame, "customers_dirty.csv")
+    captured: dict[str, object] = {}
+
+    class FakeCompletions:
+        def create(self, **kwargs: object) -> object:
+            messages = kwargs["messages"]
+            captured["messages"] = messages
+            payload = json_from_last_message(messages)
+            captured["payload"] = payload
+            message = types.SimpleNamespace(content="The follow-up should focus on remediation and ML blockers.")
+            choice = types.SimpleNamespace(message=message)
+            return types.SimpleNamespace(choices=[choice])
+
+    class FakeOpenAI:
+        def __init__(self, api_key: str) -> None:
+            self.chat = types.SimpleNamespace(completions=FakeCompletions())
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setitem(sys.modules, "openai", types.SimpleNamespace(OpenAI=FakeOpenAI))
+
+    history = [
+        AnalystChatMessage(role="user", text="How can I improve the score?"),
+        AnalystChatMessage(role="assistant", text="Start with duplicate keys."),
+    ]
+    answer = answer_question(result, "What should I do after that?", history)
+
+    messages = captured["messages"]
+    payload = captured["payload"]
+    assert answer.source == "llm"
+    assert any(message["content"] == "Start with duplicate keys." for message in messages)
+    assert payload["question"] == "What should I do after that?"
+    assert payload["audit_context"]["remediation_actions"]
+    assert payload["audit_context"]["data_contract"]["pii_columns"]
+    assert payload["audit_context"]["ml_readiness"]["blockers"]
+
+
+def json_from_last_message(messages: list[dict[str, str]]) -> dict[str, object]:
+    import json
+
+    return json.loads(messages[-1]["content"])
