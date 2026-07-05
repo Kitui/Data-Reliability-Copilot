@@ -262,6 +262,26 @@ def test_analyst_answers_least_risk_issue_question_without_llm() -> None:
     assert "DQ-010" in answer.answer
 
 
+def test_analyst_fallback_covers_broad_data_copilot_topics() -> None:
+    frame = read_csv_path(Path("samples/customers_dirty.csv"))
+    result = audit_dataframe(frame, "customers_dirty.csv")
+
+    checks = [
+        ("Tell me about the email column", "email is inferred as text"),
+        ("Which fields should I protect before sharing?", "Treat email, name, phone as sensitive"),
+        ("What contract should I use for future uploads?", "Use a data contract"),
+        ("What are the duplicate problems?", "Uniqueness findings"),
+        ("Are there any missing values?", "Completeness findings"),
+        ("What is wrong with the data?", "detected issues across"),
+    ]
+
+    answers = [answer_question(result, question).answer for question, _ in checks]
+
+    for answer, (_, expected) in zip(answers, checks):
+        assert expected in answer
+    assert len(set(answers)) == len(answers)
+
+
 def test_analyst_can_use_llm_when_configured(monkeypatch: pytest.MonkeyPatch) -> None:
     frame = read_csv_path(Path("samples/customers_dirty.csv"))
     result = audit_dataframe(frame, "customers_dirty.csv")

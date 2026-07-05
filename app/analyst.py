@@ -24,38 +24,12 @@ def answer_question(
         return llm_answer
 
     lowered = question.lower()
-    supporting = [issue.id for issue in audit.issues[:5]]
-
-    if is_score_improvement_question(lowered):
-        answer = build_score_improvement_answer(audit)
-    elif is_risk_question(lowered):
-        answer = build_risk_answer(audit, lowered)
-    elif is_report_question(lowered):
-        answer = build_report_answer(audit)
-    elif "fix" in lowered or "clean" in lowered or "remed" in lowered:
-        answer = build_fix_answer(audit)
-    elif "manager" in lowered or "executive" in lowered or "summary" in lowered:
-        answer = audit.summary.executive_summary
-    elif is_ml_question(lowered):
-        answer = build_ml_answer(audit)
-    elif "rule" in lowered or "contract" in lowered:
-        answer = (
-            "Generate a data contract from this audit, then tighten required columns, unique keys, allowed values, "
-            "numeric ranges, date ranges, and freshness thresholds for future uploads."
-        )
-    else:
-        top = "; ".join(f"{issue.title} ({issue.severity})" for issue in audit.issues[:3])
-        answer = (
-            f"This audit has score {audit.score.overall}/100 with {len(audit.issues)} issues. "
-            f"The most important items are: {top}. Ask about a specific column, score, report, ML readiness, "
-            "contract rules, or remediation plan for a more targeted answer."
-        )
 
     return AnalystAnswer(
         audit_id=audit.audit_id,
         question=question,
-        answer=answer,
-        supporting_issue_ids=supporting,
+        answer=build_grounded_fallback_answer(audit, lowered),
+        supporting_issue_ids=relevant_issue_ids(audit, lowered),
     )
 
 
@@ -89,6 +63,37 @@ def is_ml_question(lowered: str) -> bool:
 
 def is_risk_question(lowered: str) -> bool:
     return "risk" in lowered or "safest" in lowered or "least severe" in lowered or "lowest severity" in lowered
+
+
+def build_grounded_fallback_answer(audit: AuditResult, lowered: str) -> str:
+    column = find_referenced_column(audit, lowered)
+    if column is not None:
+        return build_column_overview_answer(audit, column.name)
+    if is_score_improvement_question(lowered):
+        return build_score_improvement_answer(audit)
+    if is_risk_question(lowered):
+        return build_risk_answer(audit, lowered)
+    if is_ml_question(lowered):
+        return build_ml_answer(audit)
+    if is_report_question(lowered) or any(word in lowered for word in ["manager", "executive", "summary"]):
+        return build_report_answer(audit)
+    if any(word in lowered for word in ["fix", "clean", "remed", "repair", "correct"]):
+        return build_fix_answer(audit)
+    if any(word in lowered for word in ["rule", "contract", "schema", "governance", "validate"]):
+        return build_contract_answer(audit)
+    if any(word in lowered for word in ["privacy", "pii", "sensitive", "share", "mask", "protect"]):
+        return build_privacy_answer(audit)
+    if any(word in lowered for word in ["duplicate", "unique", "dedupe"]):
+        return build_category_answer(audit, "uniqueness")
+    if any(word in lowered for word in ["missing", "blank", "null", "complete", "completeness"]):
+        return build_category_answer(audit, "completeness")
+    if any(word in lowered for word in ["valid", "format", "email", "phone"]):
+        return build_category_answer(audit, "validity")
+    if any(word in lowered for word in ["outlier", "anomaly", "unusual"]):
+        return build_category_answer(audit, "anomaly")
+    if any(word in lowered for word in ["wrong", "problem", "issue", "bad", "quality"]):
+        return build_issue_overview_answer(audit)
+    return build_capability_answer(audit)
 
 
 def build_score_improvement_answer(audit: AuditResult) -> str:
@@ -134,6 +139,81 @@ def build_ml_answer(audit: AuditResult) -> str:
     )
 
 
+def build_column_overview_answer(audit: AuditResult, column_name: str) -> str:
+    column = next(item for item in audit.profile.columns if item.name == column_name)
+    related = [issue for issue in audit.issues if column.name in issue.columns]
+    stats = safe_stats_text(column.stats)
+    issue_text = (
+        " Related issues: "
+        + "; ".join(f"{issue.id} {issue.title} ({issue.severity})" for issue in related[:4])
+        if related
+        else " No issues are directly tied to this column."
+    )
+    return (
+        f"{column.name} is inferred as {column.inferred_type}. It has {column.missing_count} missing values "
+        f"({column.missing_rate:.0%}) and {column.unique_count} unique values ({column.unique_rate:.0%} uniqueness). "
+        f"{stats}{issue_text}"
+    )
+
+
+def build_contract_answer(audit: AuditResult) -> str:
+    contract = generate_contract(audit)
+    required = ", ".join(contract.required_columns) or "none"
+    pii = ", ".join(contract.pii_columns) or "none detected"
+    allowed = ", ".join(contract.allowed_values.keys()) or "none inferred"
+    return (
+        "Use a data contract to prevent these problems from recurring. "
+        f"Required columns should include: {required}. Expected types are defined for {len(contract.expected_types)} columns. "
+        f"Controlled allowed-value fields: {allowed}. PII fields to protect: {pii}. "
+        "After editing the contract, use it as rules for future uploads so schema drift, invalid values, and missing fields are caught earlier."
+    )
+
+
+def build_privacy_answer(audit: AuditResult) -> str:
+    privacy_issues = [issue for issue in audit.issues if issue.category == "privacy"]
+    pii_columns = sorted({column for issue in privacy_issues for column in issue.columns})
+    if not pii_columns:
+        return "No PII columns were flagged by the current audit rules, but review access controls before sharing production data."
+    return (
+        f"Treat {', '.join(pii_columns)} as sensitive before sharing or using this dataset with AI tools. "
+        "Recommended controls: mask or hash values, restrict exports, avoid sending raw personal values to LLMs, "
+        "and document these fields in the data contract."
+    )
+
+
+def build_category_answer(audit: AuditResult, category: str) -> str:
+    issues = [issue for issue in audit.issues if issue.category == category]
+    if not issues:
+        return f"No {category} issues were detected by the current audit rules."
+    issue_text = " ".join(
+        f"{index}. {issue.id} {issue.title}: {issue.affected_rows} affected rows; {issue.recommendation}"
+        for index, issue in enumerate(issues[:5], start=1)
+    )
+    return f"{category.title()} findings: {issue_text}"
+
+
+def build_issue_overview_answer(audit: AuditResult) -> str:
+    counts = {}
+    for issue in audit.issues:
+        counts[issue.category] = counts.get(issue.category, 0) + 1
+    categories = ", ".join(f"{category}: {count}" for category, count in sorted(counts.items()))
+    top = "; ".join(f"{issue.id} {issue.title} ({issue.severity})" for issue in audit.issues[:5])
+    return (
+        f"This dataset has {len(audit.issues)} detected issues across {categories}. "
+        f"The current score is {audit.score.overall}/100 with {audit.summary.risk_level} risk. "
+        f"Highest-priority findings: {top}."
+    )
+
+
+def build_capability_answer(audit: AuditResult) -> str:
+    return (
+        f"I can answer questions about this audit's score ({audit.score.overall}/100), risk level "
+        f"({audit.summary.risk_level}), issues, columns, missing values, duplicates, outliers, PII, ML readiness, "
+        "remediation actions, data contracts, and report summaries. Ask about a specific column, business use case, "
+        "quality dimension, or next action and I will ground the answer in the audit results."
+    )
+
+
 def build_report_answer(audit: AuditResult) -> str:
     high_count = sum(1 for issue in audit.issues if issue.severity in {"critical", "high"})
     categories = sorted({issue.category for issue in audit.issues})
@@ -159,6 +239,27 @@ def build_fix_answer(audit: AuditResult) -> str:
 
 def severity_rank(severity: str) -> int:
     return {"low": 1, "medium": 2, "high": 3, "critical": 4}.get(severity, 0)
+
+
+def relevant_issue_ids(audit: AuditResult, lowered: str) -> list[str]:
+    column = find_referenced_column(audit, lowered)
+    if column is not None:
+        related = related_issue_ids(audit, column.name)
+        if related:
+            return related
+    category_terms = {
+        "uniqueness": ["duplicate", "unique", "dedupe"],
+        "completeness": ["missing", "blank", "null", "complete"],
+        "validity": ["valid", "format", "email", "phone"],
+        "anomaly": ["outlier", "anomaly", "unusual"],
+        "privacy": ["privacy", "pii", "sensitive", "share", "mask"],
+    }
+    for category, terms in category_terms.items():
+        if any(term in lowered for term in terms):
+            ids = [issue.id for issue in audit.issues if issue.category == category][:5]
+            if ids:
+                return ids
+    return [issue.id for issue in audit.issues[:5]]
 
 
 def answer_profile_question(audit: AuditResult, question: str) -> AnalystAnswer | None:
@@ -246,6 +347,12 @@ def format_stat(value: object) -> str:
     if isinstance(value, float):
         return f"{value:g}"
     return str(value)
+
+
+def safe_stats_text(stats: dict[str, object]) -> str:
+    safe_keys = ["min", "max", "mean", "median"]
+    parts = [f"{key}: {format_stat(stats[key])}" for key in safe_keys if key in stats]
+    return "Stats: " + ", ".join(parts) + ". " if parts else ""
 
 
 def generate_llm_answer(
