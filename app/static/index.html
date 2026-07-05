@@ -10,11 +10,20 @@
     <main class="app-shell">
       <aside class="left-rail">
         <section class="brand-block">
-          <p class="eyebrow">Data Reliability Copilot</p>
-          <h1>Data workbench</h1>
+          <div class="brand-mark" aria-hidden="true">
+            <span></span><span></span><span></span>
+          </div>
+          <div>
+            <p class="eyebrow">Data Reliability Copilot</p>
+            <h1>Reliability cockpit</h1>
+          </div>
         </section>
 
         <section class="upload-card">
+          <div class="rail-ribbon">
+            <span>Live audit mode</span>
+            <strong>CSV</strong>
+          </div>
           <div class="segmented">
             <button class="segment active" data-rule-mode="builder">Builder</button>
             <button class="segment" data-rule-mode="json">JSON</button>
@@ -22,7 +31,7 @@
           <input id="fileInput" type="file" accept=".csv">
           <button id="uploadButton">Upload CSV</button>
           <button id="sampleButton" class="secondary-button">Run sample</button>
-          <span id="status">Ready</span>
+          <span id="status" class="status-pill">Ready</span>
         </section>
 
         <section class="rail-card">
@@ -52,17 +61,36 @@
         </header>
 
         <section id="emptyState" class="empty-state">
-          <div>
-            <h2>Start with a dataset</h2>
-            <p>Upload a CSV, run the sample, or configure rules to turn this into a remediation and governance workspace.</p>
+          <div class="empty-copy">
+            <span class="ribbon-label">Audit-ready workspace</span>
+            <h2>Turn messy data into a decision-ready reliability brief</h2>
+            <p>Upload a CSV, run the sample, or configure rules to generate issues, fixes, contracts, reports, and Analyst Q&A in one working surface.</p>
             <div class="quick-start">
               <button id="emptySampleButton">Run sample audit</button>
               <button id="emptyRulesButton" class="secondary-button">Open rule builder</button>
             </div>
           </div>
+          <figure class="empty-visual">
+            <img src="/static/assets/data-cockpit.png" alt="Illustration of a data reliability cockpit">
+          </figure>
         </section>
 
         <section id="workbench" class="hidden">
+          <section class="signal-strip" aria-label="Audit signals">
+            <article class="signal-card signal-next">
+              <span>Next action</span>
+              <strong id="nextAction">Run an audit</strong>
+            </article>
+            <article class="signal-card">
+              <span>Quality posture</span>
+              <strong id="qualityPosture">Waiting for dataset</strong>
+            </article>
+            <article class="signal-card">
+              <span>Protected fields</span>
+              <strong id="protectedFields">--</strong>
+            </article>
+          </section>
+
           <section class="score-grid">
             <button class="score-card" data-score-filter="all">
               <span>Overall</span>
@@ -228,7 +256,14 @@
               </section>
 
               <section id="tab-analyst" class="tab-panel">
-                <div class="panel">
+                <div class="panel analyst-panel">
+                  <div class="analyst-head">
+                    <div>
+                      <p class="eyebrow">Conversational audit intelligence</p>
+                      <h2>Ask the dataset</h2>
+                    </div>
+                    <span class="ai-badge">Grounded AI</span>
+                  </div>
                   <div id="promptChips" class="prompt-chips"></div>
                   <div id="chatThread" class="chat-thread"></div>
                   <div class="analyst-bar">

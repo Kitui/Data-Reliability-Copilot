@@ -39,6 +39,9 @@ const els = {
   analystQuestion: document.querySelector("#analystQuestion"),
   rulesInput: document.querySelector("#rulesInput"),
   reportLink: document.querySelector("#reportLink"),
+  nextAction: document.querySelector("#nextAction"),
+  qualityPosture: document.querySelector("#qualityPosture"),
+  protectedFields: document.querySelector("#protectedFields"),
 };
 
 bindEvents();
@@ -177,6 +180,7 @@ function renderAudit(audit) {
 
   document.querySelector("#currentDataset").textContent = audit.dataset_name;
   document.querySelector("#currentTitle").textContent = `${audit.score.overall}/100 quality score - ${audit.summary.risk_level} risk`;
+  document.body.dataset.risk = audit.summary.risk_level;
   document.querySelector("#score").textContent = audit.score.overall;
   document.querySelector("#risk").textContent = audit.summary.risk_level;
   document.querySelector("#summarySource").textContent = audit.summary.source;
@@ -191,6 +195,7 @@ function renderAudit(audit) {
 
   renderList("#focusList", audit.summary.recommended_focus);
   renderList("#remediationList", audit.summary.remediation_plan);
+  renderSignalStrip(audit);
   renderBreakdown(audit.score);
   renderFilters(audit.issues);
   renderIssues();
@@ -200,6 +205,14 @@ function renderAudit(audit) {
   renderContractMini();
   renderChat();
   renderHistory();
+}
+
+function renderSignalStrip(audit) {
+  const topIssue = audit.issues[0];
+  els.nextAction.textContent = topIssue ? `${topIssue.id}: ${topIssue.title}` : "Keep monitoring new uploads";
+  els.qualityPosture.textContent = `${audit.summary.risk_level} risk - ${audit.score.overall}/100 score`;
+  const fields = privacyColumns(audit);
+  els.protectedFields.textContent = fields.length ? fields.join(", ") : "None flagged";
 }
 
 function renderBreakdown(score) {
@@ -567,8 +580,10 @@ function renderChat() {
 function renderPromptChips() {
   const prompts = [
     "What should I fix first?",
-    "Generate a manager summary",
-    "Which fields are risky for ML?",
+    "Can I use this for machine learning?",
+    "Which fields should I protect before sharing?",
+    "How do I improve the score?",
+    "What should I report to a manager?",
     "What contract rules should I add?",
   ];
   document.querySelector("#promptChips").innerHTML = prompts.map((prompt) => `<button data-prompt="${escapeHtml(prompt)}">${escapeHtml(prompt)}</button>`).join("");
