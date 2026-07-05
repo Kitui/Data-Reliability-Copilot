@@ -14,7 +14,7 @@ def _action_for_issue(issue: QualityIssue) -> RemediationAction:
     frame_ref = "df"
     if issue.category == "uniqueness":
         subset = issue.columns if len(issue.columns) <= 3 else []
-        subset_code = f", subset={subset!r}" if subset else ""
+        subset_code = f"subset={subset!r}" if subset else ""
         return RemediationAction(
             issue_id=issue.id,
             title=f"Deduplicate records for {issue.title}",

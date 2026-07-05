@@ -141,6 +141,8 @@ def test_remediation_plan_generates_actions_and_script() -> None:
     assert plan.actions
     assert "pd.read_csv" in plan.generated_cleaning_script
     assert any(action.action_type == "deduplicate" for action in plan.actions)
+    assert "drop_duplicates(, subset=" not in plan.generated_cleaning_script
+    assert "drop_duplicates(subset=['customer_id'])" in plan.generated_cleaning_script
 
 
 def test_contract_generation_can_be_reused_as_rule_config() -> None:

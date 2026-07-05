@@ -36,6 +36,11 @@ button:hover,
   background: #0d4d4f;
 }
 
+button:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
 .secondary-button,
 .icon-button {
   border: 1px solid #cbd5d9;

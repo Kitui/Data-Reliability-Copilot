@@ -9,6 +9,7 @@ const state = {
   selectedActionIds: new Set(),
   filters: { category: "all", severity: "all", status: "all", search: "" },
   chat: [],
+  busy: false,
 };
 
 const els = {
@@ -104,16 +105,25 @@ async function uploadCsv() {
 }
 
 async function runAudit(url, options) {
+  setBusy(true);
   setStatus("Auditing...");
   try {
     const response = await fetch(url, options);
     const payload = await response.json();
     if (!response.ok) throw new Error(typeof payload.detail === "string" ? payload.detail : "Audit failed.");
     renderAudit(payload);
-    await loadHistory();
+    try {
+      await loadHistory();
+    } catch (historyError) {
+      console.warn(historyError);
+      setStatus(`Completed audit for ${payload.dataset_name}. History refresh failed.`);
+      return;
+    }
     setStatus(`Completed audit for ${payload.dataset_name}`);
   } catch (error) {
     setStatus(error.message);
+  } finally {
+    setBusy(false);
   }
 }
 
@@ -729,6 +739,22 @@ function signed(value) {
 
 function setStatus(message) {
   els.statusText.textContent = message;
+}
+
+function setBusy(isBusy) {
+  state.busy = isBusy;
+  [
+    els.uploadButton,
+    els.sampleButton,
+    els.emptySampleButton,
+    els.regenerateButton,
+    els.loadRemediationButton,
+    els.loadContractButton,
+    els.compareButton,
+    els.askAnalystButton,
+  ].forEach((button) => {
+    if (button) button.disabled = isBusy;
+  });
 }
 
 function escapeHtml(value) {
