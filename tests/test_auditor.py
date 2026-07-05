@@ -1,4 +1,6 @@
 from pathlib import Path
+import sys
+import types
 
 import pytest
 
@@ -200,4 +202,30 @@ def test_analyst_answer_uses_audit_context() -> None:
 
     assert answer.audit_id == result.audit_id
     assert "deduplicate" in answer.answer.lower()
+    assert answer.supporting_issue_ids
+
+
+def test_analyst_can_use_llm_when_configured(monkeypatch: pytest.MonkeyPatch) -> None:
+    frame = read_csv_path(Path("samples/customers_dirty.csv"))
+    result = audit_dataframe(frame, "customers_dirty.csv")
+
+    class FakeCompletions:
+        def create(self, **kwargs: object) -> object:
+            assert "messages" in kwargs
+            message = types.SimpleNamespace(content="Focus on duplicate customer IDs before model training.")
+            choice = types.SimpleNamespace(message=message)
+            return types.SimpleNamespace(choices=[choice])
+
+    class FakeOpenAI:
+        def __init__(self, api_key: str) -> None:
+            assert api_key == "test-key"
+            self.chat = types.SimpleNamespace(completions=FakeCompletions())
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setitem(sys.modules, "openai", types.SimpleNamespace(OpenAI=FakeOpenAI))
+
+    answer = answer_question(result, "Can I use this for model training?")
+
+    assert answer.source == "llm"
+    assert "duplicate customer IDs" in answer.answer
     assert answer.supporting_issue_ids
