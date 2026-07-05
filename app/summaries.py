@@ -102,11 +102,17 @@ def build_llm_context(
                 "inferred_type": column.inferred_type,
                 "missing_rate": column.missing_rate,
                 "unique_rate": column.unique_rate,
+                "stats": safe_column_stats(column.stats),
             }
             for column in profile.columns
         ],
         "top_issues": [issue.model_dump(exclude={"examples"}) for issue in top_issues],
     }
+
+
+def safe_column_stats(stats: dict[str, Any]) -> dict[str, Any]:
+    allowed = {"min", "max", "mean", "median"}
+    return {key: value for key, value in stats.items() if key in allowed}
 
 
 def generate_llm_summary(context: dict[str, Any]) -> LlmAuditSummary | None:

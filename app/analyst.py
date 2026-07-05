@@ -8,6 +8,10 @@ from app.summaries import build_llm_context
 
 
 def answer_question(audit: AuditResult, question: str) -> AnalystAnswer:
+    profile_answer = answer_profile_question(audit, question)
+    if profile_answer is not None:
+        return profile_answer
+
     llm_answer = generate_llm_answer(audit, question)
     if llm_answer is not None:
         return llm_answer
@@ -45,6 +49,93 @@ def answer_question(audit: AuditResult, question: str) -> AnalystAnswer:
         answer=answer,
         supporting_issue_ids=supporting,
     )
+
+
+def answer_profile_question(audit: AuditResult, question: str) -> AnalystAnswer | None:
+    lowered = question.lower()
+    column = find_referenced_column(audit, lowered)
+    if column is None:
+        return None
+
+    stats = column.stats or {}
+    metric: str | None = None
+    label: str | None = None
+
+    if any(word in lowered for word in ["highest", "maximum", "max", "largest", "biggest"]):
+        metric = "max"
+        label = "highest"
+    elif any(word in lowered for word in ["lowest", "minimum", "min", "smallest"]):
+        metric = "min"
+        label = "lowest"
+    elif any(word in lowered for word in ["average", "mean"]):
+        metric = "mean"
+        label = "average"
+    elif "median" in lowered:
+        metric = "median"
+        label = "median"
+    elif "missing" in lowered:
+        return AnalystAnswer(
+            audit_id=audit.audit_id,
+            question=question,
+            answer=(
+                f"{column.name} has {column.missing_count} missing values "
+                f"({column.missing_rate:.0%} of {audit.profile.row_count} rows)."
+            ),
+            supporting_issue_ids=related_issue_ids(audit, column.name),
+        )
+    elif "unique" in lowered or "distinct" in lowered:
+        return AnalystAnswer(
+            audit_id=audit.audit_id,
+            question=question,
+            answer=(
+                f"{column.name} has {column.unique_count} unique values "
+                f"({column.unique_rate:.0%} uniqueness across {audit.profile.row_count} rows)."
+            ),
+            supporting_issue_ids=related_issue_ids(audit, column.name),
+        )
+
+    if metric is None:
+        return None
+    if metric not in stats:
+        return AnalystAnswer(
+            audit_id=audit.audit_id,
+            question=question,
+            answer=f"I do not have a {label} value for {column.name}. The inferred type is {column.inferred_type}.",
+            supporting_issue_ids=related_issue_ids(audit, column.name),
+        )
+
+    return AnalystAnswer(
+        audit_id=audit.audit_id,
+        question=question,
+        answer=f"The {label} {column.name} is {format_stat(stats[metric])}.",
+        supporting_issue_ids=related_issue_ids(audit, column.name),
+    )
+
+
+def find_referenced_column(audit: AuditResult, lowered_question: str):
+    compact_question = normalize_name(lowered_question)
+    for column in audit.profile.columns:
+        column_name = column.name.lower()
+        readable_name = column_name.replace("_", " ")
+        if column_name in lowered_question or readable_name in lowered_question:
+            return column
+        if normalize_name(column_name) in compact_question:
+            return column
+    return None
+
+
+def related_issue_ids(audit: AuditResult, column_name: str) -> list[str]:
+    return [issue.id for issue in audit.issues if column_name in issue.columns][:5]
+
+
+def normalize_name(value: str) -> str:
+    return "".join(character for character in value.lower() if character.isalnum())
+
+
+def format_stat(value: object) -> str:
+    if isinstance(value, float):
+        return f"{value:g}"
+    return str(value)
 
 
 def generate_llm_answer(audit: AuditResult, question: str) -> AnalystAnswer | None:

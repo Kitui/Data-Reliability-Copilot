@@ -14,6 +14,7 @@ from app.reports import build_html_report, build_markdown_report
 from app.remediation import build_remediation_plan
 from app.schemas import AuditRuleConfig, LlmAuditSummary, UploadedFileInfo
 from app.storage import AuditStore
+from app.summaries import build_llm_context
 
 
 @pytest.fixture(autouse=True)
@@ -45,6 +46,18 @@ def test_llm_context_excludes_examples() -> None:
 
     assert top_issues
     assert "examples" not in top_issues[0]
+
+
+def test_llm_context_includes_safe_column_stats() -> None:
+    frame = read_csv_path(Path("samples/customers_dirty.csv"))
+    result = audit_dataframe(frame, "customers_dirty.csv")
+
+    context = build_llm_context(result.profile, result.issues, result.score)
+    monthly_spend = next(column for column in context["columns"] if column["name"] == "monthly_spend")
+    email = next(column for column in context["columns"] if column["name"] == "email")
+
+    assert monthly_spend["stats"]["max"] == 5000.0
+    assert "top_values" not in email["stats"]
 
 
 def test_audit_store_persists_and_lists_results(tmp_path: Path) -> None:
@@ -203,6 +216,16 @@ def test_analyst_answer_uses_audit_context() -> None:
     assert answer.audit_id == result.audit_id
     assert "deduplicate" in answer.answer.lower()
     assert answer.supporting_issue_ids
+
+
+def test_analyst_answers_direct_column_stat_question() -> None:
+    frame = read_csv_path(Path("samples/customers_dirty.csv"))
+    result = audit_dataframe(frame, "customers_dirty.csv")
+
+    answer = answer_question(result, "What is the highest monthly_spend?")
+
+    assert answer.answer == "The highest monthly_spend is 5000."
+    assert "DQ-009" in answer.supporting_issue_ids
 
 
 def test_analyst_can_use_llm_when_configured(monkeypatch: pytest.MonkeyPatch) -> None:
