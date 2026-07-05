@@ -1,5 +1,7 @@
 # Data Reliability Copilot
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Kitui/Data-Reliability-Copilot)
+
 Data Reliability Copilot is an LLM-ready data quality, remediation, and governance app. It accepts tabular datasets, profiles their structure, detects quality issues with deterministic rules, scores dataset health, generates remediation actions, creates reusable data contracts, compares audit versions, and produces business-friendly recommendations.
 
 ## MVP Capabilities
