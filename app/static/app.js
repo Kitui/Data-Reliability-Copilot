@@ -50,6 +50,12 @@ renderPromptChips();
 
 function bindEvents() {
   els.uploadButton.addEventListener("click", uploadCsv);
+  els.fileInput.addEventListener("change", () => {
+    if (!els.fileInput.files.length) return;
+    const file = els.fileInput.files[0];
+    setStatus(`Selected ${file.name}. Starting audit...`);
+    uploadCsv();
+  });
   els.sampleButton.addEventListener("click", () => runAudit("/audits/sample", { method: "POST" }));
   els.emptySampleButton.addEventListener("click", () => runAudit("/audits/sample", { method: "POST" }));
   els.emptyRulesButton.addEventListener("click", () => activateTab("rules"));
@@ -100,20 +106,26 @@ async function uploadCsv() {
     setStatus("Choose a CSV file first.");
     return;
   }
+  if (state.busy) return;
+  const file = els.fileInput.files[0];
+  if (!file.name.toLowerCase().endsWith(".csv")) {
+    setStatus("Please upload a CSV file. This MVP does not read Excel files yet.");
+    return;
+  }
   syncRulesFromBuilder(false);
   const form = new FormData();
-  form.append("file", els.fileInput.files[0]);
+  form.append("file", file);
   if (els.rulesInput.value.trim()) form.append("rules_json", els.rulesInput.value.trim());
-  await runAudit("/audits/upload", { method: "POST", body: form });
+  await runAudit("/audits/upload", { method: "POST", body: form }, `Uploading ${file.name}...`);
 }
 
-async function runAudit(url, options) {
+async function runAudit(url, options, busyMessage = "Auditing...") {
   setBusy(true);
-  setStatus("Auditing...");
+  setStatus(busyMessage);
   try {
     const response = await fetch(url, options);
-    const payload = await response.json();
-    if (!response.ok) throw new Error(typeof payload.detail === "string" ? payload.detail : "Audit failed.");
+    const payload = await parseResponse(response);
+    if (!response.ok) throw new Error(responseErrorMessage(payload, response.status));
     renderAudit(payload);
     try {
       await loadHistory();
@@ -123,11 +135,30 @@ async function runAudit(url, options) {
       return;
     }
     setStatus(`Completed audit for ${payload.dataset_name}`);
+    document.querySelector("#workbench")?.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (error) {
-    setStatus(error.message);
+    setStatus(error.message || "Audit failed. Please try another CSV.");
   } finally {
     setBusy(false);
   }
+}
+
+async function parseResponse(response) {
+  const text = await response.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { detail: text };
+  }
+}
+
+function responseErrorMessage(payload, status) {
+  if (typeof payload.detail === "string" && payload.detail.trim()) return payload.detail;
+  if (Array.isArray(payload.detail)) return payload.detail.map((item) => item.msg || JSON.stringify(item)).join(" ");
+  if (status === 413) return "That CSV is too large for this deployment. Try a smaller file or increase the Render upload limit.";
+  if (status >= 500) return "The server hit an error while auditing this CSV. Check the Render logs for the exact traceback.";
+  return "Audit failed. Confirm the file is a valid CSV and try again.";
 }
 
 async function loadHistory() {
@@ -806,6 +837,7 @@ function setStatus(message) {
 
 function setBusy(isBusy) {
   state.busy = isBusy;
+  if (els.fileInput) els.fileInput.disabled = isBusy;
   [
     els.uploadButton,
     els.sampleButton,
@@ -818,6 +850,7 @@ function setBusy(isBusy) {
   ].forEach((button) => {
     if (button) button.disabled = isBusy;
   });
+  if (els.uploadButton) els.uploadButton.textContent = isBusy ? "Auditing..." : "Upload CSV";
 }
 
 function escapeHtml(value) {
