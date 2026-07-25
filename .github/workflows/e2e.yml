@@ -1,0 +1,64 @@
+name: Browser E2E
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  playwright:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: drc_e2e
+          POSTGRES_USER: drc
+          POSTGRES_PASSWORD: drc-e2e-only
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U drc -d drc_e2e"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DRC_ENVIRONMENT: testing
+      DRC_DATABASE_URL: postgresql+psycopg://drc:drc-e2e-only@127.0.0.1:5432/drc_e2e
+      DRC_STORAGE_BACKEND: local
+      DRC_STORAGE_ROOT: /tmp/drc-e2e-data
+      DRC_ADMIN_EMAIL: admin@drc.test
+      DRC_ADMIN_PASSWORD: StrongPassword123!
+      DRC_ALLOWED_HOSTS: localhost,127.0.0.1,testserver
+      DRC_CSRF_ENABLED: "false"
+      DRC_RUN_MIGRATIONS: "true"
+      DRC_ENABLE_INTERNAL_SCHEDULER: "false"
+      DRC_SCHEDULER_TOKEN: ci-scheduler-token-that-is-long-enough
+      DRC_E2E_BASE_URL: http://127.0.0.1:8000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12', cache: pip }
+      - uses: actions/setup-node@v4
+        with: { node-version: '22', cache: npm }
+      - run: pip install -r requirements.txt
+      - run: npm install --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - name: Start application
+        run: |
+          uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/drc.log 2>&1 &
+          echo $! > /tmp/drc.pid
+      - name: Wait for readiness
+        run: |
+          for i in {1..60}; do curl -fsS http://127.0.0.1:8000/health/ready && exit 0; sleep 2; done
+          cat /tmp/drc.log
+          exit 1
+      - run: npm run test:e2e
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report
+            test-results
+          retention-days: 14

@@ -3,8 +3,6 @@ from __future__ import annotations
 import json
 
 import pandas as pd
-from pathlib import Path
-from uuid import uuid4
 from datetime import datetime, timezone
 from typing import Literal
 
@@ -18,6 +16,7 @@ from app.api.auth_dependencies import require_user
 from app.db.models import AuditRecord, DatasetRecord, UploadRecord
 from app.db.session import get_session_factory
 from app.core.config import get_settings
+from app.services.dataset_files import DatasetFileError, build_dataset_file_service
 from app.ingestion import IngestionError, read_csv_bytes, read_csv_path
 from app.profiler import profile_dataset
 from app.auditor import audit_dataframe
@@ -163,9 +162,9 @@ def preview_dataset(dataset_id: int, limit: int = Query(default=10, ge=1, le=50)
         rows = []
         profile_data = stored_profile
         if upload is not None:
-            path = get_settings().root_dir / upload.relative_path
-            if path.exists():
-                frame = read_csv_path(path)
+            files = build_dataset_file_service()
+            if files.exists(upload.relative_path):
+                frame = read_csv_bytes(files.read_bytes(upload.relative_path), upload.original_filename)
                 profile = profile_dataset(frame)
                 profile_data = profile.model_dump()
                 safe = frame.head(limit)
@@ -283,26 +282,42 @@ def update_dataset(dataset_id: int, payload: DatasetUpdate, user: dict = Depends
 
 @router.delete("/{dataset_id}", status_code=204)
 def delete_dataset(dataset_id: int, user: dict = Depends(require_user)):
+    workspace_id = int(user["workspace"]["id"])
     Session = get_session_factory()
+    storage_keys: list[str] = []
+
     with Session() as db:
-        row = db.scalar(select(DatasetRecord).where(DatasetRecord.id == dataset_id, DatasetRecord.workspace_id == user["workspace"]["id"]))
-        if row is None: raise HTTPException(404, "Dataset not found.")
-        db.delete(row); db.commit()
+        row = db.scalar(select(DatasetRecord).where(
+            DatasetRecord.id == dataset_id,
+            DatasetRecord.workspace_id == workspace_id,
+        ))
+        if row is None:
+            raise HTTPException(404, "Dataset not found.")
+
+        audit_ids = list(db.scalars(select(AuditRecord.audit_id).where(
+            AuditRecord.workspace_id == workspace_id,
+            AuditRecord.dataset_name == row.name,
+        )).all())
+        if audit_ids:
+            storage_keys = list(db.scalars(select(UploadRecord.relative_path).where(
+                UploadRecord.audit_id.in_(audit_ids),
+            )).all())
+
+        db.delete(row)
+        db.commit()
+
+    files = build_dataset_file_service()
+    for key in dict.fromkeys(item for item in storage_keys if item):
+        try:
+            files.delete(key)
+        except DatasetFileError:
+            # Database deletion remains authoritative; object cleanup is idempotent
+            # and can be retried later by operational tooling.
+            continue
 
 
-def _save_version_upload(content: bytes, original_filename: str, content_type: str | None) -> UploadedFileInfo:
-    settings = get_settings()
-    extension = Path(original_filename).suffix.lower() or ".csv"
-    stored_filename = f"{uuid4()}{extension}"
-    path = settings.upload_dir / stored_filename
-    path.write_bytes(content)
-    return UploadedFileInfo(
-        original_filename=original_filename,
-        stored_filename=stored_filename,
-        path=str(path.relative_to(settings.root_dir)),
-        size_bytes=len(content),
-        content_type=content_type,
-    )
+def _save_version_upload(content: bytes, original_filename: str, content_type: str | None, workspace_id: int) -> UploadedFileInfo:
+    return build_dataset_file_service().save_upload(content, original_filename, content_type, workspace_id, category="versions")
 
 
 @router.post("/{dataset_id}/versions/import", status_code=201)
@@ -330,22 +345,36 @@ async def import_dataset_version(
     filename = file.filename or "dataset-version.csv"
     if not filename.lower().endswith(".csv"):
         raise HTTPException(400, "Only CSV dataset versions are supported.")
+    upload_info: UploadedFileInfo | None = None
     try:
         content = await file.read()
         if not content:
             raise HTTPException(400, "The selected CSV file is empty.")
-        upload_info = _save_version_upload(content, filename, file.content_type)
+        upload_info = _save_version_upload(content, filename, file.content_type, int(workspace_id))
         frame = read_csv_bytes(content, filename)
         quality_rules = assigned_rules_for_dataset(workspace_id, dataset.name)
         result = audit_dataframe(frame, dataset.name, upload=upload_info, quality_rules=quality_rules)
         result.audit_kind = "version_import"
         result.dataset_version = int(previous_count) + 1
-    except IngestionError as exc:
+    except (IngestionError, DatasetFileError) as exc:
+        if upload_info is not None:
+            try:
+                build_dataset_file_service().delete(upload_info.path)
+            except DatasetFileError:
+                pass
         raise HTTPException(400, str(exc)) from exc
 
-    get_audit_store().save(result, workspace_id)
-    persist_rule_executions(result.audit_id, result.rule_executions)
-    register_audit_dataset(result, workspace_id, str(user.get("full_name") or "Workspace team"))
+    try:
+        get_audit_store().save(result, workspace_id)
+        persist_rule_executions(result.audit_id, result.rule_executions)
+        register_audit_dataset(result, workspace_id, str(user.get("full_name") or "Workspace team"))
+    except Exception:
+        if upload_info is not None:
+            try:
+                build_dataset_file_service().delete(upload_info.path)
+            except DatasetFileError:
+                pass
+        raise
     persisted = get_audit_store().get(result.audit_id, workspace_id)
     if persisted is None:
         raise HTTPException(500, "The version was processed but its automatic audit could not be verified.")

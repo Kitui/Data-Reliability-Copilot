@@ -17,7 +17,8 @@ from app.schemas import AuditResult, DataContract, RuleDefinition
 from pydantic import BaseModel, Field
 from app.contracts import generate_contract
 from app.core.config import get_settings
-from app.ingestion import read_csv_path
+from app.services.dataset_files import build_dataset_file_service
+from app.ingestion import read_csv_bytes, read_csv_path
 from app.versioning import lineage_audits
 from app.quality_rules import execute_quality_rules
 
@@ -564,10 +565,19 @@ def test_rule_builder(payload: RuleBuilderTestPayload, user: dict = Depends(requ
         if not dataset.latest_audit_id:
             raise HTTPException(409, "Import and audit the dataset before testing a rule.")
         upload = db.scalar(select(UploadRecord).where(UploadRecord.audit_id == dataset.latest_audit_id))
-        path = get_settings().root_dir / upload.relative_path if upload is not None else get_settings().root_dir / "samples" / "customers_dirty.csv"
-        if not path.exists():
-            raise HTTPException(409, "The source file for the latest audit is unavailable.")
-    frame = read_csv_path(path)
+        if upload is not None:
+            files = build_dataset_file_service()
+            if not files.exists(upload.relative_path):
+                raise HTTPException(409, "The source file for the latest audit is unavailable.")
+            content = files.read_bytes(upload.relative_path)
+            source_name = upload.original_filename
+        else:
+            path = get_settings().root_dir / "samples" / "customers_dirty.csv"
+            if not path.exists():
+                raise HTTPException(409, "The source file for the latest audit is unavailable.")
+            content = path.read_bytes()
+            source_name = path.name
+    frame = read_csv_bytes(content, source_name)
     issues, executions = execute_quality_rules(frame, [payload.rule])
     execution = executions[0]
     issue = issues[0] if issues else None

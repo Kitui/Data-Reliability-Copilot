@@ -79,6 +79,9 @@ class AuditStore:
                     relative_path=audit.upload.path,
                     size_bytes=audit.upload.size_bytes,
                     content_type=audit.upload.content_type,
+                    storage_backend=audit.upload.storage_backend,
+                    checksum_sha256=audit.upload.checksum_sha256,
+                    display_name=audit.upload.display_name,
                 ))
 
     def get(self, audit_id: str, workspace_id: int | None = None) -> AuditResult | None:

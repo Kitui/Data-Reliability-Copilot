@@ -1,0 +1,6 @@
+/* Accessibility and keyboard support */
+.skip-link { position: fixed; left: 12px; top: 10px; z-index: 9999; transform: translateY(-160%); padding: 10px 14px; border-radius: 8px; background: #0f2238; color: #fff; font-weight: 700; }
+.skip-link:focus { transform: translateY(0); }
+:focus-visible { outline: 3px solid #0a8f84; outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { *,*::before,*::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
+@media (forced-colors: active) { .status-badge,.metric-card,.dashboard-card { border: 1px solid CanvasText; } }

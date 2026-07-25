@@ -12,7 +12,7 @@ def require_user(drc_session: str | None = Cookie(default=None)) -> dict[str, ob
     if not drc_session:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required.")
     with session_scope() as db:
-        row = db.execute(select(SessionRecord, UserRecord).join(UserRecord, UserRecord.id == SessionRecord.user_id).where(SessionRecord.token_hash == token_digest(drc_session))).first()
+        row = db.execute(select(SessionRecord, UserRecord).join(UserRecord, UserRecord.id == SessionRecord.user_id).where(SessionRecord.token_hash == token_digest(drc_session), SessionRecord.revoked_at.is_(None))).first()
         if not row:
             raise HTTPException(status_code=401, detail="Invalid session.")
         session, user = row
@@ -33,7 +33,7 @@ def require_user(drc_session: str | None = Cookie(default=None)) -> dict[str, ob
                 workspace = db.scalar(select(WorkspaceRecord).where(WorkspaceRecord.organization_id == membership.organization_id, WorkspaceRecord.is_active == 1).order_by(WorkspaceRecord.id))
                 organization = db.get(OrganizationRecord, membership.organization_id)
                 if workspace: session.active_workspace_id = workspace.id
-        return {"id": user.id, "email": user.email, "full_name": user.full_name, "role": user.role,
+        return {"id": user.id, "email": user.email, "full_name": user.full_name, "role": user.role, "email_verified": bool(user.email_verified_at),
                 "membership_role": membership.role if membership else None,
                 "organization": {"id": organization.id, "name": organization.name, "slug": organization.slug} if organization else None,
                 "workspace": {"id": workspace.id, "name": workspace.name, "slug": workspace.slug, "description": workspace.description} if workspace else None}

@@ -188,6 +188,9 @@ class UploadedFileInfo(BaseModel):
     path: str
     size_bytes: int
     content_type: str | None = None
+    storage_backend: str = "local"
+    checksum_sha256: str | None = None
+    display_name: str | None = None
 
 
 class LlmAuditSummary(BaseModel):

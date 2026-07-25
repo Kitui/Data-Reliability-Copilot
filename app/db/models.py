@@ -61,6 +61,9 @@ class UploadRecord(Base):
     relative_path: Mapped[str] = mapped_column(String(500), nullable=False)
     size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
     content_type: Mapped[str | None] = mapped_column(String(255))
+    storage_backend: Mapped[str] = mapped_column(String(24), nullable=False, default="local")
+    checksum_sha256: Mapped[str | None] = mapped_column(String(64))
+    display_name: Mapped[str | None] = mapped_column(String(255))
 
     audit: Mapped[AuditRecord] = relationship(back_populates="upload")
 
@@ -75,6 +78,8 @@ class UserRecord(Base):
     is_active: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
 
     memberships: Mapped[list[OrganizationMembershipRecord]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
@@ -96,8 +101,47 @@ class SessionRecord(Base):
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     user_agent: Mapped[str | None] = mapped_column(String(500))
     active_workspace_id: Mapped[int | None] = mapped_column(ForeignKey("workspaces.id", ondelete="SET NULL"))
+    ip_address: Mapped[str | None] = mapped_column(String(64))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
 
     user: Mapped[UserRecord] = relationship(back_populates="sessions")
+
+
+class LoginAttemptRecord(Base):
+    __tablename__ = "login_attempts"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    email: Mapped[str] = mapped_column(String(320), nullable=False, index=True)
+    ip_address: Mapped[str | None] = mapped_column(String(64), index=True)
+    succeeded: Mapped[int] = mapped_column(Integer, nullable=False, default=0, index=True)
+    attempted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    user_agent: Mapped[str | None] = mapped_column(String(500))
+
+
+class AccountTokenRecord(Base):
+    __tablename__ = "account_tokens"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    purpose: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class AdministrativeAuditLogRecord(Base):
+    __tablename__ = "administrative_audit_log"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    workspace_id: Mapped[int | None] = mapped_column(ForeignKey("workspaces.id", ondelete="SET NULL"), index=True)
+    organization_id: Mapped[int | None] = mapped_column(ForeignKey("organizations.id", ondelete="SET NULL"), index=True)
+    actor_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), index=True)
+    action: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    resource_type: Mapped[str | None] = mapped_column(String(80), index=True)
+    resource_id: Mapped[str | None] = mapped_column(String(120))
+    outcome: Mapped[str] = mapped_column(String(24), nullable=False, default="success", index=True)
+    ip_address: Mapped[str | None] = mapped_column(String(64))
+    user_agent: Mapped[str | None] = mapped_column(String(500))
+    details_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
 
 
 class OrganizationRecord(Base):
@@ -267,6 +311,7 @@ class AuditScheduleRecord(Base):
     created_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
 
 
 class ScheduledAuditRunRecord(Base):
@@ -284,6 +329,8 @@ class ScheduledAuditRunRecord(Base):
     score: Mapped[int | None] = mapped_column(Integer)
     issue_count: Mapped[int | None] = mapped_column(Integer)
     error_message: Mapped[str | None] = mapped_column(Text)
+    background_job_id: Mapped[int | None] = mapped_column(ForeignKey("background_jobs.id", ondelete="SET NULL"), index=True)
+    scheduled_for: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
 
 class AlertRecord(Base):
     __tablename__ = "alerts"
@@ -444,3 +491,15 @@ class BackgroundJobRecord(Base):
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     failed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class OperationalAlertRecord(Base):
+    __tablename__ = "operational_alerts"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    alert_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    severity: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="open", index=True)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    details_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

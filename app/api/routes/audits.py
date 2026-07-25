@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from datetime import timezone
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.encoders import jsonable_encoder
-from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse
 from sqlalchemy import select
 from pydantic import ValidationError
 
@@ -19,6 +18,7 @@ from app.auditor import audit_dataframe
 from app.comparison import compare_audits
 from app.contracts import generate_contract
 from app.core.config import get_settings
+from app.services.dataset_files import DatasetFileError, build_dataset_file_service
 from app.db.models import AuditRecord, UploadRecord
 from app.db.session import get_session_factory
 from app.ingestion import IngestionError, read_csv_bytes, read_csv_path
@@ -34,6 +34,9 @@ from app.schemas import (
 from app.summaries import summarize_audit
 from app.scoring import score_audit
 from app.issue_lifecycle import list_activities, record_activity
+from app.jobs.runtime import get_dispatcher
+from app.jobs.service import create_job, serialise_job
+from app.jobs.types import JobType
 
 router = APIRouter(prefix="/audits", tags=["Audits"])
 
@@ -55,19 +58,8 @@ def parse_rule_config(raw_rules: str | None) -> AuditRuleConfig:
     return AuditRuleConfig.model_validate(payload)
 
 
-def save_upload(content: bytes, original_filename: str, content_type: str | None) -> UploadedFileInfo:
-    settings = get_settings()
-    extension = Path(original_filename).suffix.lower() or ".csv"
-    stored_filename = f"{uuid4()}{extension}"
-    path = settings.upload_dir / stored_filename
-    path.write_bytes(content)
-    return UploadedFileInfo(
-        original_filename=original_filename,
-        stored_filename=stored_filename,
-        path=str(path.relative_to(settings.root_dir)),
-        size_bytes=len(content),
-        content_type=content_type,
-    )
+def save_upload(content: bytes, original_filename: str, content_type: str | None, workspace_id: int) -> UploadedFileInfo:
+    return build_dataset_file_service().save_upload(content, original_filename, content_type, workspace_id)
 
 
 def _utc_datetime(value):
@@ -90,24 +82,90 @@ def list_audits(user: dict[str, object] = Depends(require_user)) -> list[AuditLi
     return jsonable_encoder(rows)
 
 
+@router.post("/upload/async", status_code=202)
+async def upload_audit_async(file: UploadFile = File(...), rules_json: str | None = Form(default=None), user: dict[str, object] = Depends(require_user)):
+    """Persist an upload, queue its audit, and return immediately with a trackable job."""
+    workspace_id = int(user["workspace"]["id"])
+    content = await file.read()
+    upload_info: UploadedFileInfo | None = None
+    try:
+        rule_config = parse_rule_config(rules_json)
+        upload_info = save_upload(content, file.filename or "uploaded.csv", file.content_type, workspace_id)
+        # Validate CSV synchronously so malformed uploads fail before a job is created.
+        read_csv_bytes(content, file.filename or "uploaded.csv")
+    except (IngestionError, DatasetFileError) as exc:
+        if upload_info is not None:
+            build_dataset_file_service().delete(upload_info.path)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ValidationError as exc:
+        if upload_info is not None:
+            build_dataset_file_service().delete(upload_info.path)
+        raise HTTPException(status_code=400, detail=json.loads(exc.json())) from exc
+
+    idempotency_key = f"dataset-audit:{workspace_id}:{upload_info.checksum_sha256 or uuid4()}"
+    job, created = create_job(
+        workspace_id=workspace_id,
+        created_by_user_id=int(user["id"]),
+        job_type=JobType.DATASET_AUDIT,
+        idempotency_key=idempotency_key,
+        payload={
+            "storage_key": upload_info.path,
+            "filename": file.filename or "uploaded.csv",
+            "content_type": file.content_type,
+            "upload": upload_info.model_dump(mode="json"),
+            "rule_config": rule_config.model_dump(mode="json"),
+            "owner_name": str(user.get("full_name") or "Workspace team"),
+            "audit_kind": "dataset_import",
+            "dataset_version": 1,
+        },
+    )
+    if created:
+        get_dispatcher().enqueue(job.id, idempotency_key=job.idempotency_key)
+    elif upload_info.path != json.loads(job.payload_json or "{}").get("storage_key"):
+        # An idempotent duplicate does not need a second stored copy.
+        build_dataset_file_service().delete(upload_info.path)
+    return serialise_job(job)
+
+
 @router.post("/upload", response_model=AuditResult)
 async def upload_audit(file: UploadFile = File(...), rules_json: str | None = Form(default=None), user: dict[str, object] = Depends(require_user)) -> AuditResult:
+    workspace_id = int(user["workspace"]["id"])
+    upload_info: UploadedFileInfo | None = None
     try:
         content = await file.read()
         rule_config = parse_rule_config(rules_json)
-        upload_info = save_upload(content, file.filename or "uploaded.csv", file.content_type)
+        upload_info = save_upload(content, file.filename or "uploaded.csv", file.content_type, workspace_id)
         frame = read_csv_bytes(content, file.filename or "uploaded.csv")
-        quality_rules = assigned_rules_for_dataset(user["workspace"]["id"], file.filename or "uploaded.csv")
+        quality_rules = assigned_rules_for_dataset(workspace_id, file.filename or "uploaded.csv")
         result = audit_dataframe(frame, file.filename or "uploaded.csv", rule_config=rule_config, upload=upload_info, quality_rules=quality_rules)
         result.audit_kind = "dataset_import"
         result.dataset_version = 1
-    except IngestionError as exc:
+    except (IngestionError, DatasetFileError) as exc:
+        if upload_info is not None:
+            try:
+                build_dataset_file_service().delete(upload_info.path)
+            except DatasetFileError:
+                pass
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except ValidationError as exc:
+        if upload_info is not None:
+            try:
+                build_dataset_file_service().delete(upload_info.path)
+            except DatasetFileError:
+                pass
         raise HTTPException(status_code=400, detail=json.loads(exc.json())) from exc
-    get_audit_store().save(result, user["workspace"]["id"])
-    persist_rule_executions(result.audit_id, result.rule_executions)
-    register_audit_dataset(result, user["workspace"]["id"], str(user.get("full_name") or "Workspace team"))
+
+    try:
+        get_audit_store().save(result, workspace_id)
+        persist_rule_executions(result.audit_id, result.rule_executions)
+        register_audit_dataset(result, workspace_id, str(user.get("full_name") or "Workspace team"))
+    except Exception:
+        if upload_info is not None:
+            try:
+                build_dataset_file_service().delete(upload_info.path)
+            except DatasetFileError:
+                pass
+        raise
     return jsonable_encoder(result)
 
 
@@ -129,16 +187,16 @@ def rerun_audit(audit_id: str, user: dict[str, object] = Depends(require_user)) 
 
     try:
         if upload_record is not None:
-            source_path = get_settings().root_dir / upload_record.relative_path
-            if not source_path.exists():
+            files = build_dataset_file_service()
+            if not files.exists(upload_record.relative_path):
                 raise HTTPException(status_code=409, detail="The source file for this audit is no longer available.")
-            content = source_path.read_bytes()
-            upload_info = save_upload(content, upload_record.original_filename, upload_record.content_type)
+            content = files.read_bytes(upload_record.relative_path)
+            upload_info = save_upload(content, upload_record.original_filename, upload_record.content_type, int(workspace_id))
             frame = read_csv_bytes(content, upload_record.original_filename)
         elif source_audit.dataset_name == get_settings().sample_dataset.name:
             source_path = get_settings().sample_dataset
             content = source_path.read_bytes()
-            upload_info = save_upload(content, source_path.name, "text/csv")
+            upload_info = save_upload(content, source_path.name, "text/csv", int(workspace_id))
             frame = read_csv_path(source_path)
         else:
             raise HTTPException(status_code=409, detail="This dataset has no persisted source file to rerun.")
@@ -363,10 +421,15 @@ def _audit_source_frame(audit_id: str, workspace_id: int):
         record = session.scalar(select(AuditRecord).where(AuditRecord.audit_id == audit_id, AuditRecord.workspace_id == workspace_id))
         if record is None or record.upload is None:
             raise HTTPException(status_code=404, detail="Source dataset is not available for this audit.")
-        source_path = get_settings().root_dir / record.upload.relative_path
-    if not source_path.exists():
+        storage_key = record.upload.relative_path
+        original_filename = record.upload.original_filename
+    files = build_dataset_file_service()
+    if not files.exists(storage_key):
         raise HTTPException(status_code=404, detail="Source dataset file is missing.")
-    return read_csv_path(source_path)
+    try:
+        return read_csv_bytes(files.read_bytes(storage_key), original_filename)
+    except (DatasetFileError, IngestionError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.post("/{audit_id}/remediation/preview", response_model=RemediationPreview)
@@ -395,12 +458,19 @@ def apply_remediation(audit_id: str, request: RemediationRequest, user: dict[str
     corrected, stats = apply_remediation_actions(frame, audit, request.issue_ids, request.fill_strategy, request.mask_sensitive)
     cleaned_name = f"cleaned_{audit.dataset_name}"
     csv_content = corrected.to_csv(index=False).encode("utf-8")
-    upload_info = save_upload(csv_content, cleaned_name, "text/csv")
-    quality_rules = assigned_rules_for_dataset(workspace_id, audit.dataset_name)
-    corrected_audit = audit_dataframe(corrected, cleaned_name, upload=upload_info, quality_rules=quality_rules, scoring_context=audit.scoring_context)
-    get_audit_store().save(corrected_audit, workspace_id)
-    register_audit_dataset(corrected_audit, workspace_id, str(user.get("full_name") or "Workspace team"))
-    persist_rule_executions(corrected_audit.audit_id, corrected_audit.rule_executions)
+    upload_info = save_upload(csv_content, cleaned_name, "text/csv", int(workspace_id))
+    try:
+        quality_rules = assigned_rules_for_dataset(workspace_id, audit.dataset_name)
+        corrected_audit = audit_dataframe(corrected, cleaned_name, upload=upload_info, quality_rules=quality_rules, scoring_context=audit.scoring_context)
+        get_audit_store().save(corrected_audit, workspace_id)
+        register_audit_dataset(corrected_audit, workspace_id, str(user.get("full_name") or "Workspace team"))
+        persist_rule_executions(corrected_audit.audit_id, corrected_audit.rule_executions)
+    except Exception:
+        try:
+            build_dataset_file_service().delete(upload_info.path)
+        except DatasetFileError:
+            pass
+        raise
     return jsonable_encoder(RemediationApplyResult(
         source_audit_id=audit_id, corrected_audit=corrected_audit,
         download_url=f"/audits/{corrected_audit.audit_id}/source.csv", applied_actions=len(request.issue_ids),
@@ -408,7 +478,7 @@ def apply_remediation(audit_id: str, request: RemediationRequest, user: dict[str
     ))
 
 
-@router.get("/{audit_id}/source.csv", response_class=FileResponse)
+@router.get("/{audit_id}/source.csv", response_class=PlainTextResponse)
 def download_audit_source(audit_id: str, user: dict[str, object] = Depends(require_user)):
     workspace_id = user["workspace"]["id"]
     load_audit(audit_id, workspace_id)
@@ -416,11 +486,12 @@ def download_audit_source(audit_id: str, user: dict[str, object] = Depends(requi
         record = session.scalar(select(AuditRecord).where(AuditRecord.audit_id == audit_id, AuditRecord.workspace_id == workspace_id))
         if record is None or record.upload is None:
             raise HTTPException(status_code=404, detail="Source dataset is not available.")
-        path = get_settings().root_dir / record.upload.relative_path
+        storage_key = record.upload.relative_path
         filename = record.upload.original_filename
-    if not path.exists():
+    files = build_dataset_file_service()
+    if not files.exists(storage_key):
         raise HTTPException(status_code=404, detail="Source dataset file is missing.")
-    return FileResponse(path, media_type="text/csv", filename=filename)
+    return PlainTextResponse(files.read_bytes(storage_key), media_type="text/csv", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
 @router.get("/{audit_id}/contract", response_model=DataContract)

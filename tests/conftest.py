@@ -17,6 +17,8 @@ def isolated_test_database(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("DRC_DATABASE_PATH", str(database_path))
     monkeypatch.delenv("DRC_DATABASE_URL", raising=False)
     monkeypatch.setenv("DRC_ENVIRONMENT", "testing")
+    monkeypatch.setenv("DRC_STORAGE_BACKEND", "local")
+    monkeypatch.delenv("DRC_GCS_BUCKET", raising=False)
     monkeypatch.setenv("DRC_ADMIN_EMAIL", "admin@drc.local")
     monkeypatch.setenv("DRC_ADMIN_PASSWORD", "ChangeMe123!")
     monkeypatch.setenv("DRC_ENABLE_INTERNAL_SCHEDULER", "false")

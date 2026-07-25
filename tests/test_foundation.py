@@ -446,10 +446,11 @@ def test_feature_20_navigation_is_grouped_and_workspace_selector_is_in_sidebar()
 
 def test_scheduled_audit_score_is_persisted_as_numeric_and_empty_form_error_is_hidden() -> None:
     schedules = (Path(__file__).parents[1] / "app" / "api" / "routes" / "schedules.py").read_text(encoding="utf-8")
+    handlers = (Path(__file__).parents[1] / "app" / "jobs" / "handlers.py").read_text(encoding="utf-8")
     html = (Path(__file__).parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
     javascript = (Path(__file__).parents[1] / "app" / "static" / "app.js").read_text(encoding="utf-8")
-    assert "run.score=result.score.overall" in schedules
-    assert '"score":result.score.overall' in schedules
+    assert "run.score = result.score.overall" in handlers
+    assert '"score": result.score.overall' in handlers
     assert 'id="scheduleFormError" class="form-error hidden"' in html
     assert "error.classList.add('hidden')" in javascript
     assert "error.classList.remove('hidden')" in javascript
@@ -484,9 +485,10 @@ def test_feature_20_4_month_calendar_polished_table_and_worker_are_wired() -> No
     assert "scheduleIcons" in javascript
     assert ".calendar-day.has-runs" in styles
     assert ".schedule-cell-stack" in styles
-    assert "_scheduled_audit_worker" in main
-    assert "asyncio.to_thread(schedules.process_all_due)" in main
+    assert "_scheduled_audit_worker" not in main
+    assert "asyncio.to_thread(schedules.process_all_due)" not in main
     assert "def process_all_due" in schedules
+    assert '@router.post("/dispatch"' in schedules
     assert '/static/app.js?v=' in html
 
 

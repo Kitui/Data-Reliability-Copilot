@@ -4,7 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Data Reliability Copilot</title>
+  <link rel="stylesheet" href="/static/css/base.css?v=0.31.0">
   <link rel="stylesheet" href="/static/styles.css?v=0.25.2">
+  <link rel="stylesheet" href="/static/css/components.css?v=0.31.0">
+  <link rel="stylesheet" href="/static/css/accessibility.css?v=0.31.0">
   <!-- compatibility marker: /static/styles.css?v=0.25.0 -->
   <!-- Feature 20.4 compatibility marker: /static/app.js?v=0.25.8 -->
   <!-- compatibility marker: /static/app.js?v=0.25.8 /static/app.js?v=0.25.8 /static/app.js?v=0.25.8 -->
@@ -12,6 +15,9 @@
   <!-- Legacy asset regression marker: styles.css?v=0.17.7 -->
 </head>
 <body>
+    <a class="skip-link" href="#mainContent">Skip to main content</a>
+    <div id="appStatusRegion" class="status-region" role="status" aria-live="polite" aria-atomic="true"></div>
+    <div id="appAlertRegion" class="status-region" role="alert" aria-live="assertive" aria-atomic="true"></div>
   <!-- Removed desktop hamburger marker retained for regression compatibility: id="sidebarToggleButton" -->
   <!-- Navigation regression markers retained after collapsible group upgrade:
   nav-group-label">Data management< nav-group-label">Automation< nav-group-label">Governance< nav-group-label">Administration<
@@ -81,7 +87,7 @@
       <span id="organizationName" class="hidden">Organization</span>
     </header>
 
-    <main class="main-content">
+    <main id="mainContent" class="main-content" tabindex="-1">
       <section id="overviewPage" class="page-view command-overview">
         <span class="hidden">Enterprise Reliability Workspace</span>
         <section class="command-ribbon">
@@ -909,8 +915,14 @@
       </form>
     </section>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/static/js/core/http.js?v=0.31.0"></script>
+    <script src="/static/js/core/datetime.js?v=0.31.0"></script>
+    <script src="/static/js/core/dom.js?v=0.31.0"></script>
+    <script src="/static/js/components/feedback.js?v=0.31.0"></script>
+    <script src="/static/js/components/states.js?v=0.31.0"></script>
+    <script src="/static/js/accessibility.js?v=0.31.0"></script>
     <!-- compatibility marker: /static/app.js?v=0.25.8 -->
-    <script src="/static/app.js?v=0.25.8"></script>
+    <script src="/static/app.js?v=0.31.0"></script>
   </body>
 </html>
 
