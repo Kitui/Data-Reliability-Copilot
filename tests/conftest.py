@@ -18,6 +18,7 @@ def isolated_test_database(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("DRC_ENVIRONMENT", "testing")
     monkeypatch.setenv("DRC_STORAGE_BACKEND", "local")
     monkeypatch.setenv("DRC_CSRF_ENABLED", "false")
+    monkeypatch.setenv("DRC_RUN_MIGRATIONS", "true")
     monkeypatch.delenv("DRC_GCS_BUCKET", raising=False)
     monkeypatch.setenv("DRC_ADMIN_EMAIL", "admin@drc.local")
     monkeypatch.setenv("DRC_ADMIN_PASSWORD", "ChangeMe123!")
