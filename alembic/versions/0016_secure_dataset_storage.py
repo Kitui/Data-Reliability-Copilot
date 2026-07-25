@@ -1,4 +1,4 @@
-q"""secure dataset storage metadata
+"""secure dataset storage metadata
 
 Revision ID: 0016
 Revises: 0015
