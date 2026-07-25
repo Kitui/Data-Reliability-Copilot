@@ -8,7 +8,7 @@ def test_reports_ui_is_wired():
     assert 'Score vs Issue Count' in html
 
 def test_reports_routes_registered():
-    paths={r.path for r in create_app().routes}
+    paths = create_app().openapi()["paths"]
     assert '/reports' in paths
     assert '/reports/schedules' in paths
     assert '/reports/export/{format}' in paths

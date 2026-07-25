@@ -13,4 +13,7 @@ def test_overview_command_centre_ui_is_wired():
     assert ".command-ribbon" in css
 
 def test_overview_command_centre_route_registered():
-    assert "/reports/overview" in {route.path for route in create_app().routes}
+    app = create_app()
+    paths = app.openapi()["paths"]
+
+    assert "/reports/overview" in paths
