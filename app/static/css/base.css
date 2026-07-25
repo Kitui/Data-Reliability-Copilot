@@ -1,0 +1,4 @@
+/* Feature 31: frontend foundation modules */
+:root { color-scheme: light; }
+html { scroll-behavior: smooth; }
+body { text-rendering: optimizeLegibility; }

@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  quality-and-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: drc_test
+          POSTGRES_USER: drc
+          POSTGRES_PASSWORD: drc-ci-only
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U drc -d drc_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DRC_ENVIRONMENT: testing
+      DRC_DATABASE_URL: postgresql+psycopg://drc:drc-ci-only@127.0.0.1:5432/drc_test
+      DRC_STORAGE_BACKEND: local
+      DRC_STORAGE_ROOT: /tmp/drc-data
+      DRC_ADMIN_EMAIL: admin@drc.test
+      DRC_ADMIN_PASSWORD: StrongPassword123!
+      DRC_ALLOWED_HOSTS: localhost,127.0.0.1,testserver
+      DRC_CSRF_ENABLED: "false"
+      DRC_RUN_MIGRATIONS: "false"
+      DRC_ENABLE_INTERNAL_SCHEDULER: "false"
+      DRC_SCHEDULER_TOKEN: ci-scheduler-token-that-is-long-enough
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - name: Compile
+        run: python -m compileall -q app tests scripts
+      - name: Lint
+        run: ruff check app scripts tests/test_ci_cd.py
+      - name: Type check core boundaries
+        run: mypy app/core/config.py app/services/object_storage.py app/services/dataset_files.py
+      - name: Migration upgrade
+        run: alembic upgrade head
+      - name: Migration current
+        run: alembic current
+      - name: Tests with coverage
+        run: coverage run -m pytest && coverage report --fail-under=70
+      - name: Security checks
+        run: |
+          python scripts/security_check.py
+          bandit -q -r app -x tests
+          pip-audit -r requirements.txt
+
+  container-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: drc:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

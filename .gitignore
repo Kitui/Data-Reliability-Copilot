@@ -39,6 +39,19 @@ backup_before_e2e/
 .idea/
 .DS_Store
 Thumbs.db
+# Phase 6 test and build outputs
+.coverage
+coverage.xml
+htmlcov/
+node_modules/
+playwright-report/
+test-results/
+.mypy_cache/
+.ruff_cache/
+
+# Runtime backup and workspace files
+backups/
+data/workspaces/
 
 
 # Local runtime and generated test files

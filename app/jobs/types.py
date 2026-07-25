@@ -16,8 +16,10 @@ class JobStatus(StrEnum):
 
 
 class JobType(StrEnum):
+    DATASET_IMPORT = "dataset_audit"
     DATASET_AUDIT = "dataset_audit"
     CONTRACT_VALIDATION = "contract_validation"
     REMEDIATION = "remediation"
     REPORT_GENERATION = "report_generation"
     CONNECTOR_SYNC = "connector_sync"
+    SCHEDULED_AUDIT = "scheduled_audit"

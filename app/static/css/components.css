@@ -1,0 +1,11 @@
+/* Shared component states */
+[aria-busy="true"] { cursor: progress; }
+.ui-skeleton { min-height: 1rem; border-radius: 6px; background: linear-gradient(90deg,#eef2f5 25%,#f8fafb 50%,#eef2f5 75%); background-size: 200% 100%; animation: drc-skeleton 1.3s infinite; }
+@keyframes drc-skeleton { to { background-position: -200% 0; } }
+.status-region { position: fixed; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.shared-state { display:grid; place-items:center; gap:8px; min-height:130px; padding:24px; text-align:center; color:var(--muted,#65758b); }
+.shared-state h3,.shared-state p { margin:0; }
+.shared-error-state { color:#9b2c2c; }
+.shared-loading-state { grid-auto-flow:column; justify-content:center; }
+.ui-spinner { width:18px; height:18px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:drc-spin .75s linear infinite; }
+@keyframes drc-spin { to { transform:rotate(360deg); } }

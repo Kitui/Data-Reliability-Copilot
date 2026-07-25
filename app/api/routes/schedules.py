@@ -1,29 +1,17 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
-from time import perf_counter
-from threading import Lock
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status as http_status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.api.auth_dependencies import require_roles, require_user
-from app.api.dependencies import get_audit_store
-from app.api.routes.datasets import register_audit_dataset
-from app.api.routes.quality_rules import assigned_rules_for_dataset, persist_rule_executions
-from app.auditor import audit_dataframe
 from app.core.config import get_settings
-from app.db.models import AuditRecord, AuditScheduleRecord, DatasetRecord, ScheduledAuditRunRecord, UploadRecord
+from app.db.models import AuditRecord, AuditScheduleRecord, DatasetRecord, ScheduledAuditRunRecord
 from app.db.session import get_session_factory
-from app.ingestion import read_csv_path
-from app.api.routes.audits import save_upload
 
 router = APIRouter(prefix="/schedules", tags=["Scheduled Audits"])
-
-_execution_lock = Lock()
-_running_schedule_ids: set[int] = set()
 
 class ScheduleCreate(BaseModel):
     dataset_id: int
@@ -94,101 +82,28 @@ def serialize_schedule(row: AuditScheduleRecord, dataset: DatasetRecord | None, 
     }
 
 
-def execute_schedule(schedule_id: int, workspace_id: int, actor_name: str, triggered_by: str = "manual") -> dict:
-    Session = get_session_factory(); started = utcnow(); timer = perf_counter()
-    with Session() as db:
-        schedule = db.scalar(select(AuditScheduleRecord).where(AuditScheduleRecord.id == schedule_id, AuditScheduleRecord.workspace_id == workspace_id))
-        if not schedule: raise HTTPException(404, "Schedule not found.")
-        dataset = db.scalar(select(DatasetRecord).where(DatasetRecord.id == schedule.dataset_id, DatasetRecord.workspace_id == workspace_id))
-        run = ScheduledAuditRunRecord(schedule_id=schedule.id, workspace_id=workspace_id, dataset_id=schedule.dataset_id, status="in_progress", triggered_by=triggered_by, started_at=started)
-        db.add(run); db.commit(); db.refresh(run); run_id = run.id
-        latest_audit_id = dataset.latest_audit_id if dataset else None
-        upload = db.scalar(select(UploadRecord).where(UploadRecord.audit_id == latest_audit_id)) if latest_audit_id else None
-    try:
-        if not dataset or not latest_audit_id: raise RuntimeError("The scheduled dataset has no completed source audit.")
-        if upload:
-            source_path = get_settings().root_dir / upload.relative_path
-            if not source_path.exists(): raise RuntimeError("The source file is no longer available.")
-            content = source_path.read_bytes()
-            upload_info = save_upload(content, upload.original_filename, upload.content_type)
-            frame = read_csv_path(source_path)
-        else:
-            source_path = get_settings().sample_dataset
-            if dataset.name != source_path.name: raise RuntimeError("The scheduled dataset has no persisted source file.")
-            content = source_path.read_bytes(); upload_info = save_upload(content, source_path.name, "text/csv"); frame = read_csv_path(source_path)
-        rules = assigned_rules_for_dataset(workspace_id, dataset.name)
-        result = audit_dataframe(frame, dataset.name, upload=upload_info, quality_rules=rules)
-        result.audit_kind = "scheduled"
-        try:
-            source_payload = get_audit_store().get(latest_audit_id, workspace_id)
-            result.dataset_version = source_payload.dataset_version if source_payload else None
-        except Exception:
-            result.dataset_version = None
-        get_audit_store().save(result, workspace_id); persist_rule_executions(result.audit_id, result.rule_executions)
-        register_audit_dataset(result, workspace_id, actor_name)
-        completed = utcnow(); duration = int((perf_counter()-timer)*1000)
-        with Session() as db:
-            schedule = db.get(AuditScheduleRecord, schedule_id); run = db.get(ScheduledAuditRunRecord, run_id)
-            run.audit_id=result.audit_id; run.status="completed"; run.completed_at=completed; run.duration_ms=duration; run.score=result.score.overall; run.issue_count=len(result.issues)
-            schedule.last_run_at=completed; schedule.last_status="completed"; schedule.last_audit_id=result.audit_id; schedule.last_error=None
-            schedule.next_run_at=next_occurrence(schedule.frequency,schedule.hour,schedule.minute,schedule.day_of_week,schedule.day_of_month,completed,schedule.timezone_offset_minutes or 0); schedule.updated_at=completed
-            db.commit()
-        return {"status":"completed","audit_id":result.audit_id,"score":result.score.overall,"issue_count":len(result.issues),"duration_ms":duration}
-    except Exception as exc:
-        completed=utcnow(); duration=int((perf_counter()-timer)*1000)
-        with Session() as db:
-            schedule=db.get(AuditScheduleRecord,schedule_id); run=db.get(ScheduledAuditRunRecord,run_id)
-            run.status="failed"; run.completed_at=completed; run.duration_ms=duration; run.error_message=str(exc)
-            schedule.last_run_at=completed; schedule.last_status="failed"; schedule.last_error=str(exc); schedule.next_run_at=next_occurrence(schedule.frequency,schedule.hour,schedule.minute,schedule.day_of_week,schedule.day_of_month,completed,schedule.timezone_offset_minutes or 0); schedule.updated_at=completed
-            db.commit()
-        raise HTTPException(409, str(exc))
-
-
-def _claim_schedule(schedule_id: int) -> bool:
-    with _execution_lock:
-        if schedule_id in _running_schedule_ids:
-            return False
-        _running_schedule_ids.add(schedule_id)
-        return True
-
-
-def _release_schedule(schedule_id: int) -> None:
-    with _execution_lock:
-        _running_schedule_ids.discard(schedule_id)
-
-
-def process_due(workspace_id: int, actor_name: str) -> None:
-    Session=get_session_factory(); now=utcnow()
-    with Session() as db:
-        ids=list(db.scalars(select(AuditScheduleRecord.id).where(AuditScheduleRecord.workspace_id==workspace_id, AuditScheduleRecord.status=="active", AuditScheduleRecord.next_run_at<=now).order_by(AuditScheduleRecord.next_run_at)).all())
-    for schedule_id in ids[:5]:
-        if not _claim_schedule(schedule_id):
-            continue
-        try:
-            execute_schedule(schedule_id, workspace_id, actor_name, "schedule")
-        except HTTPException:
-            pass
-        finally:
-            _release_schedule(schedule_id)
-
 
 def process_all_due(actor_name: str = "Scheduled automation") -> int:
-    """Execute due schedules across every workspace. Safe for the background poller."""
-    Session=get_session_factory(); now=utcnow()
-    with Session() as db:
-        due=list(db.execute(select(AuditScheduleRecord.id, AuditScheduleRecord.workspace_id).where(AuditScheduleRecord.status=="active", AuditScheduleRecord.next_run_at<=now).order_by(AuditScheduleRecord.next_run_at).limit(25)).all())
-    completed=0
-    for schedule_id, workspace_id in due:
-        if not _claim_schedule(schedule_id):
-            continue
-        try:
-            execute_schedule(schedule_id, workspace_id, actor_name, "schedule")
-            completed += 1
-        except HTTPException:
-            pass
-        finally:
-            _release_schedule(schedule_id)
-    return completed
+    """Compatibility wrapper for dedicated dispatch callers and older integrations."""
+    from app.scheduling.service import dispatch_due_schedules
+
+    return len(dispatch_due_schedules(actor_name=actor_name))
+
+
+@router.post("/dispatch", status_code=http_status.HTTP_202_ACCEPTED)
+def dispatch_due(
+    x_drc_scheduler_token: str | None = Header(default=None, alias="X-DRC-Scheduler-Token"),
+):
+    """Claim due schedules and enqueue jobs; intended for Cloud Scheduler or a dedicated cron service."""
+    import secrets
+
+    from app.scheduling.service import dispatch_due_schedules
+
+    expected = get_settings().scheduler_token
+    if not expected or not x_drc_scheduler_token or not secrets.compare_digest(expected, x_drc_scheduler_token):
+        raise HTTPException(401, "Invalid scheduler token.")
+    jobs = dispatch_due_schedules()
+    return {"dispatched": len(jobs), "jobs": jobs}
 
 
 @router.get("")
@@ -217,7 +132,7 @@ def dashboard(timezone_offset_minutes: int | None = Query(default=None, ge=-840,
     upcoming=sorted([r for r in rows if r["status"]=="active"],key=lambda x:x["next_run_at"])[:6]
     run_rows=[]
     for r in runs[:12]:
-        d=datasets.get(r.dataset_id); run_rows.append({"id":r.id,"dataset_name":d.name if d else "Unavailable dataset","started_at":ensure_utc(r.started_at),"completed_at":ensure_utc(r.completed_at),"duration_ms":r.duration_ms,"status":r.status,"score":r.score,"issue_count":r.issue_count,"triggered_by":r.triggered_by,"audit_id":r.audit_id,"error_message":r.error_message})
+        d=datasets.get(r.dataset_id); run_rows.append({"id":r.id,"dataset_name":d.name if d else "Unavailable dataset","started_at":ensure_utc(r.started_at),"completed_at":ensure_utc(r.completed_at),"duration_ms":r.duration_ms,"status":r.status,"score":r.score,"issue_count":r.issue_count,"triggered_by":r.triggered_by,"audit_id":r.audit_id,"error_message":r.error_message,"background_job_id":r.background_job_id,"scheduled_for":ensure_utc(r.scheduled_for)})
     return {"schedules":rows,"upcoming":upcoming,"runs":run_rows,"metrics":{"total":len(rows),"active":sum(x["status"]=="active" for x in rows),"completed_7d":sum(x.status=="completed" for x in recent),"failed_7d":sum(x.status=="failed" for x in recent),"next_run_at":upcoming[0]["next_run_at"] if upcoming else None}}
 
 @router.post("")
@@ -230,9 +145,22 @@ def create(payload: ScheduleCreate, user: dict = Depends(require_roles("owner","
         db.add(row);db.commit();db.refresh(row)
         return {"id":row.id,"message":"Schedule created."}
 
-@router.post("/{schedule_id}/run")
-def run_now(schedule_id:int,user:dict=Depends(require_roles("owner","admin"))):
-    return execute_schedule(schedule_id,user["workspace"]["id"],str(user.get("full_name") or "Workspace team"),"manual")
+@router.post("/{schedule_id}/run", status_code=http_status.HTTP_202_ACCEPTED)
+def run_now(schedule_id: int, user: dict = Depends(require_roles("owner", "admin"))):
+    from app.scheduling.service import queue_manual_run
+
+    try:
+        job = queue_manual_run(
+            schedule_id,
+            int(user["workspace"]["id"]),
+            str(user.get("full_name") or "Workspace team"),
+            int(user["id"]),
+        )
+    except LookupError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    return {"message": "Scheduled audit queued.", "job": job}
 
 @router.patch("/{schedule_id}/status")
 def status(schedule_id:int,payload:dict,user:dict=Depends(require_roles("owner","admin"))):

@@ -422,3 +422,7 @@ It covers the platform foundation, authentication, workspaces, dataset managemen
 ## Production foundation
 
 The cleaned baseline includes PostgreSQL readiness, environment validation, local/GCS object-storage interfaces, and a background-job foundation. See `documents/FEATURE_25_PRODUCTION_FOUNDATION_STEPS_1_10.md` for configuration and validation details.
+
+## Quality gates and CI/CD
+
+Feature 32 adds PostgreSQL-backed CI, migration validation, coverage, Playwright browser tests, security checks, container verification and a controlled Cloud Run deployment workflow. See `documents/FEATURE_32_TESTING_AND_CICD.md`.

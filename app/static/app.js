@@ -1,24 +1,8 @@
-
+// Core utilities are loaded from /static/js/core modules.
+const readCookie = window.DRC.http.readCookie;
 const DISPLAY_TIME_ZONE = "Africa/Nairobi";
-function parseServerDate(value) {
-  if (!value) return null;
-  if (value instanceof Date) return value;
-  const raw = String(value).trim();
-  const hasZone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw);
-  const parsed = new Date(hasZone ? raw : `${raw}Z`);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
-function formatDateTime(value, options = {}) {
-  const parsed = parseServerDate(value);
-  if (!parsed) return "--";
-  return new Intl.DateTimeFormat("en-KE", {
-    timeZone: DISPLAY_TIME_ZONE,
-    year: "numeric", month: "numeric", day: "numeric",
-    hour: "2-digit", minute: "2-digit", second: options.includeSeconds === false ? undefined : "2-digit",
-    hour12: true,
-    ...options,
-  }).format(parsed);
-}
+const parseServerDate = window.DRC.datetime.parseServerDate;
+const formatDateTime = window.DRC.datetime.formatDateTime;
 
 const authEls = {
   gate: document.querySelector("#authGate"), loginForm: document.querySelector("#loginForm"), registerForm: document.querySelector("#registerForm"),
@@ -419,7 +403,44 @@ async function uploadCsv() {
   const form = new FormData();
   form.append("file", file);
   if (els.rulesInput.value.trim()) form.append("rules_json", els.rulesInput.value.trim());
-  await runAudit("/audits/upload", { method: "POST", body: form }, `Uploading ${file.name}...`);
+  await runBackgroundAudit(form, file.name);
+}
+
+async function runBackgroundAudit(form, filename) {
+  setBusy(true);
+  setStatus(`Uploading ${filename} and creating background job...`);
+  try {
+    const response = await fetch("/audits/upload/async", { method: "POST", body: form });
+    const job = await parseResponse(response);
+    if (!response.ok) throw new Error(responseErrorMessage(job, response.status));
+    setStatus(`Audit queued. Job #${job.id} is ${job.status}.`);
+    const result = await pollBackgroundJob(job.id);
+    if (!result?.audit_id) throw new Error("The audit job completed without an audit result.");
+    await openAudit(result.audit_id);
+    await loadHistory();
+    setStatus(`Completed background audit for ${result.dataset_name}.`);
+    document.querySelector("#workbench")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    return result;
+  } catch (error) {
+    setStatus(error.message || "Background audit failed.");
+    return null;
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function pollBackgroundJob(jobId) {
+  const terminal = new Set(["completed", "failed", "cancelled"]);
+  while (true) {
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    const response = await fetch(`/jobs/${jobId}`);
+    const job = await parseResponse(response);
+    if (!response.ok) throw new Error(responseErrorMessage(job, response.status));
+    setStatus(`Audit job #${job.id}: ${job.status.replaceAll("_", " ")} (${job.progress}%).`);
+    if (!terminal.has(job.status)) continue;
+    if (job.status === "completed") return job.result;
+    throw new Error(job.error_message || `Audit job ${job.status}.`);
+  }
 }
 
 async function runAudit(url, options, busyMessage = "Auditing...") {
@@ -3151,7 +3172,7 @@ async function populateScheduleDatasets(){const response=await fetch('/datasets'
 async function openScheduleDialog(){await populateScheduleDatasets();const error=document.querySelector('#scheduleFormError');error.textContent='';error.classList.add('hidden');document.querySelector('#scheduleDialog').showModal();}
 function updateScheduleFields(){const f=document.querySelector('#scheduleFrequency').value;document.querySelector('#scheduleWeekdayWrap').classList.toggle('hidden',f!=='weekly');document.querySelector('#scheduleMonthdayWrap').classList.toggle('hidden',f!=='monthly');}
 async function createSchedule(event){event.preventDefault();const [hour,minute]=document.querySelector('#scheduleTime').value.split(':').map(Number);const frequency=document.querySelector('#scheduleFrequency').value;const body={dataset_id:Number(document.querySelector('#scheduleDataset').value),name:document.querySelector('#scheduleName').value||null,frequency,hour,minute,timezone_offset_minutes:new Date().getTimezoneOffset(),day_of_week:frequency==='weekly'?Number(document.querySelector('#scheduleWeekday').value):null,day_of_month:frequency==='monthly'?Number(document.querySelector('#scheduleMonthday').value):null};const response=await fetch('/schedules',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const payload=await response.json().catch(()=>({}));if(!response.ok){const error=document.querySelector('#scheduleFormError');error.textContent=payload.detail||'Unable to create schedule.';error.classList.remove('hidden');return;}document.querySelector('#scheduleDialog').close();setStatus('Audit schedule created.');await loadSchedules();}
-async function runScheduleNow(id){setStatus('Running scheduled audit\u2026');const r=await fetch(`/schedules/${id}/run`,{method:'POST'});const p=await r.json().catch(()=>({}));setStatus(r.ok?'Scheduled audit completed.':(p.detail||'Scheduled audit failed.'));await loadSchedules();}
+async function runScheduleNow(id){setStatus('Queueing scheduled audit\u2026');const r=await fetch(`/schedules/${id}/run`,{method:'POST'});const p=await r.json().catch(()=>({}));if(!r.ok){setStatus(p.detail||'Scheduled audit could not be queued.');return;}const job=p.job;setStatus(`Scheduled audit queued as job #${job.id}.`);try{const result=await pollBackgroundJob(job.id);setStatus(`Scheduled audit completed with score ${result.score}.`);}catch(error){setStatus(error.message||'Scheduled audit failed.');}await loadSchedules();}
 async function toggleSchedule(id,current){const status=current==='active'?'paused':'active';await fetch(`/schedules/${id}/status`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status})});await loadSchedules();}
 
 function scheduleOccurrencesForMonth(item, monthDate){
@@ -3386,7 +3407,6 @@ function applyConsistentShellIcons(){
  const notification=document.querySelector('.notification-button');if(notification){notification.childNodes[0].textContent='';notification.insertAdjacentHTML('afterbegin',shellSvgIcons.alerts)}
 }
 function enhanceKeyboardAccessibility(){
- document.querySelectorAll('button:not([type])').forEach(button=>button.setAttribute('type','button'));
- document.querySelectorAll('[data-dataset-id],[data-connector-id],[data-alert-id]').forEach(row=>{if(!row.hasAttribute('tabindex'))row.tabIndex=0});
+ window.DRC?.dom?.initialiseAccessibility();
 }
 if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',()=>{bindAppMessageDialog();applyConsistentShellIcons();enhanceKeyboardAccessibility()})}else{bindAppMessageDialog();applyConsistentShellIcons();enhanceKeyboardAccessibility()}
