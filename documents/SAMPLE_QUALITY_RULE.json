@@ -1,0 +1,15 @@
+{
+  "name": "Customer Email Format",
+  "description": "Ensures customer email addresses use a valid and consistently structured email format.",
+  "rule_type": "email",
+  "scope": "column",
+  "column_name": "email",
+  "category": "validity",
+  "severity": "high",
+  "parameters": {
+    "allow_blank": false,
+    "trim_whitespace": true
+  },
+  "recommendation": "Correct malformed email addresses, remove surrounding whitespace, and quarantine records that cannot be validated.",
+  "is_active": true
+}

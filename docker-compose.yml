@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: drc
+      POSTGRES_USER: drc
+      POSTGRES_PASSWORD: drc-local-only
+    ports:
+      - "5432:5432"
+    volumes:
+      - drc_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U drc -d drc"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  drc_postgres_data:

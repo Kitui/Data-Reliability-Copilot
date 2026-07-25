@@ -1,0 +1,5 @@
+customer_id,email,age,loyalty_tier,country
+1,alice@example.com,30,gold,KE
+2,bob@example.com,unknown,silver,KE
+3,carol@example.com,42,gold,UG
+4,,unknown,bronze,TZ

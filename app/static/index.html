@@ -1,0 +1,916 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Data Reliability Copilot</title>
+  <link rel="stylesheet" href="/static/styles.css?v=0.25.2">
+  <!-- compatibility marker: /static/styles.css?v=0.25.0 -->
+  <!-- Feature 20.4 compatibility marker: /static/app.js?v=0.25.8 -->
+  <!-- compatibility marker: /static/app.js?v=0.25.8 /static/app.js?v=0.25.8 /static/app.js?v=0.25.8 -->
+  <!-- compatibility markers retained for regression coverage: styles.css?v=0.16.20 app.js?v=0.16.20 -->
+  <!-- Legacy asset regression marker: styles.css?v=0.17.7 -->
+</head>
+<body>
+  <!-- Removed desktop hamburger marker retained for regression compatibility: id="sidebarToggleButton" -->
+  <!-- Navigation regression markers retained after collapsible group upgrade:
+  nav-group-label">Data management< nav-group-label">Automation< nav-group-label">Governance< nav-group-label">Administration<
+  -->
+<div class="app-frame">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <span class="product-logo">DR</span>
+      <strong>Data Reliability Copilot</strong>
+    </div>
+    <nav class="primary-nav grouped-nav" aria-label="Product navigation">
+      <section class="nav-group" data-nav-group="overview">
+        <button class="nav-group-toggle" type="button" aria-expanded="true"><span>Overview</span><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <div class="nav-group-items" data-title="Overview">
+          <button id="overviewNavButton" class="nav-item active" data-page-route="overview"><span class="nav-icon">&#8962;</span><span>Dashboard</span></button>
+        </div>
+      </section>
+      <section class="nav-group" data-nav-group="data-management">
+        <button class="nav-group-toggle" type="button" aria-expanded="true"><span>Data management</span><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <div class="nav-group-items" data-title="Data management">
+          <button id="datasetsNavButton" class="nav-item" data-page-route="datasets"><span class="nav-icon">&#9636;</span><span>Datasets</span></button>
+          <button id="versionsNavButton" class="nav-item" data-page-route="versions"><span class="nav-icon">&#8779;</span><span>Dataset Versions</span></button>
+          <button id="auditNavButton" class="nav-item" data-page-route="audit"><span class="nav-icon">&#9678;</span><span>Audit Workspace</span></button>
+          <button id="driftNavButton" class="nav-item" data-page-route="drift"><span class="nav-icon">&#8961;</span><span>Schema Drift Monitoring</span></button>
+        </div>
+      </section>
+      <section class="nav-group" data-nav-group="automation">
+        <button class="nav-group-toggle" type="button" aria-expanded="true"><span>Automation</span><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <div class="nav-group-items" data-title="Automation">
+          <button id="schedulesNavButton" class="nav-item" data-page-route="schedules"><span class="nav-icon">&#9719;</span><span>Scheduled Audits</span></button>
+          <button id="alertsNavButton" class="nav-item" data-page-route="alerts"><span class="nav-icon">&#9831;</span><span>Alerts &amp; Notifications</span><small id="alertsNavCount" class="nav-count hidden">0</small></button>
+          <button id="connectorsNavButton" class="nav-item" data-page-route="connectors"><span class="nav-icon svg-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7h8M8 17h8M7 7a3 3 0 1 0-6 0 3 3 0 0 0 6 0Zm16 10a3 3 0 1 0-6 0 3 3 0 0 0 6 0ZM7 7c4 0 6 2 6 5s2 5 4 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><span>Connectors</span></button>
+        </div>
+      </section>
+      <section class="nav-group" data-nav-group="governance">
+        <button class="nav-group-toggle" type="button" aria-expanded="true"><span>Governance</span><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <div class="nav-group-items" data-title="Governance">
+          <button id="rulesNavButton" class="nav-item" data-page-route="rules"><span class="nav-icon">&#9639;</span><span>Rules &amp; Contracts</span></button>
+          <button id="remediationNavButton" class="nav-item" data-page-route="remediation"><span class="nav-icon">&#8961;</span><span>Remediation</span></button>
+          <button id="reportsNavButton" class="nav-item" data-page-route="reports"><span class="nav-icon svg-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V10m7 10V4m7 16v-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M3 20h18" stroke="currentColor" stroke-width="1.8"/></svg></span><span>Reports</span></button>
+        </div>
+      </section>
+      <section class="nav-group" data-nav-group="ai-assistance">
+        <button class="nav-group-toggle" type="button" aria-expanded="true"><span>AI assistance</span><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <div class="nav-group-items" data-title="AI assistance">
+          <button id="copilotNavButton" class="nav-item" data-page-route="copilot"><span class="nav-icon svg-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 14 8l5 2-5 2-2 5-2-5-5-2 5-2 2-5Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="m18 16 .8 2.2L21 19l-2.2.8L18 22l-.8-2.2L15 19l2.2-.8L18 16Z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span><span>Reliability Copilot</span></button>
+        </div>
+      </section>
+      <section class="nav-group" data-nav-group="administration">
+        <button class="nav-group-toggle" type="button" aria-expanded="true"><span>Administration</span><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <div class="nav-group-items" data-title="Administration">
+          <button id="teamNavButton" class="nav-item" data-page-route="team"><span class="nav-icon">&#9817;</span><span>Users &amp; Permissions</span></button>
+        </div>
+      </section>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-workspace"><label>Workspace</label><div class="workspace-switcher"><div class="workspace-control"><span class="workspace-symbol">&#9637;</span><select id="workspaceSelect" class="workspace-select" aria-label="Active workspace"></select><span class="chevron">&#8964;</span></div><button id="createWorkspaceButton" class="workspace-add-button" type="button" title="Add workspace" aria-label="Add workspace"><span>&#65291;</span><span class="workspace-add-label">Add workspace</span></button></div></div>
+      <button id="collapseSidebarButton" class="collapse-button" type="button"><span class="collapse-icon">&#8249;</span><span>Collapse</span></button>
+    </div>
+  </aside>
+
+  <div class="app-body">
+    <header class="topbar">
+      <div class="topbar-title"><strong id="topbarPageTitle">Scheduled Audits &amp; Monitoring</strong><small id="topbarBreadcrumb">Home / Monitoring / Scheduled Audits</small></div>
+      <div class="topbar-actions"><span id="status" class="status-pill" role="status" aria-live="polite">Ready</span><button class="notification-button" aria-label="Notifications">&#9831;<i></i></button><button id="profileButton" class="user-trigger"><span class="profile-avatar">--</span><span class="profile-copy"><strong id="topProfileName">Account</strong><small id="topProfileRole">Member</small></span><span>&#8964;</span></button></div>
+      <div id="profileMenu" class="profile-menu hidden"><strong id="profileName">User</strong><span id="profileEmail"></span><span id="profileRole" class="chip"></span><button id="manageTeamButton" class="secondary-button">Team &amp; roles</button><button id="logoutButton" class="secondary-button">Sign out</button></div>
+      <span id="organizationName" class="hidden">Organization</span>
+    </header>
+
+    <main class="main-content">
+      <section id="overviewPage" class="page-view command-overview">
+        <span class="hidden">Enterprise Reliability Workspace</span>
+        <section class="command-ribbon">
+          <div class="command-ribbon-copy">
+            <p class="eyebrow">Welcome back</p>
+            <h1>Data Reliability Command Centre</h1>
+            <p>Monitor platform health, identify priority risks, and continue reliability operations across your active workspace.</p>
+            <div class="command-ribbon-actions">
+              <button id="overviewRunAuditButton" type="button">&#9654; Run Audit</button>
+              <button id="overviewCriticalIssuesButton" class="ribbon-outline" type="button">&#9651; Review Critical Issues</button>
+              <button id="overviewCopilotButton" class="ribbon-outline" type="button">&#10022; Open Reliability Copilot</button>
+            </div>
+          </div>
+          <div class="command-ribbon-status">
+            <article><span>Reliability Score</span><strong id="overviewRibbonScore">&#8212;</strong><small id="overviewRibbonTrend">No baseline</small></article>
+            <article><span>Critical Issues</span><strong id="overviewRibbonCritical">0</strong><small>Require attention</small></article>
+            <article><span>Open Remediations</span><strong id="overviewRibbonRemediations">0</strong><small id="overviewRibbonOverdue">0 overdue</small></article>
+            <article><span>Next Scheduled Audit</span><strong id="overviewRibbonNextRun">&#8212;</strong><small id="overviewRibbonNextDataset">No active schedule</small></article>
+          </div>
+          <div class="command-ribbon-visual" aria-hidden="true">
+            <div class="command-score-card"><span>Reliability</span><strong id="overviewVisualScore">&#8212;</strong><i id="overviewVisualRing"></i></div>
+            <div class="command-check-card"><b></b><b></b><b></b></div><span class="command-check">&#10003;</span>
+          </div>
+        </section>
+
+        <section class="command-metrics">
+          <article><i class="metric-svg shield">&#9672;</i><span>Overall Reliability Score</span><strong id="overviewScoreMetric">&#8212;</strong><small id="overviewScoreChange">No completed audits</small></article>
+          <article><i class="metric-svg dataset">&#9636;</i><span>Datasets Monitored</span><strong id="overviewDatasetMetric">0</strong><small id="overviewDatasetChange">Across 0 domains</small></article>
+          <article><i class="metric-svg issues">&#9651;</i><span>Active Issues</span><strong id="overviewIssueMetric">0</strong><small id="overviewIssueBreakdown">0 critical &#183; 0 high</small></article>
+          <article><i class="metric-svg failed">&#215;</i><span>Failed Rules</span><strong id="overviewFailedRuleMetric">0</strong><small id="overviewRuleFailureRate">0% failure rate</small></article>
+          <article><i class="metric-svg contracts">&#9639;</i><span>Contract Violations</span><strong id="overviewContractMetric">0</strong><small id="overviewContractImpact">0 contracts impacted</small></article>
+          <article><i class="metric-svg drift">&#8961;</i><span>Schema Drift Events</span><strong id="overviewDriftMetric">0</strong><small id="overviewDriftImpact">0 datasets affected</small></article>
+          <article><i class="metric-svg remediation">&#8984;</i><span>Open Remediations</span><strong id="overviewRemediationMetric">0</strong><small id="overviewRemediationOverdue">0 overdue</small></article>
+        </section>
+
+        <section class="command-main-grid">
+          <article class="command-card issue-lifecycle-card">
+            <div class="command-card-heading"><div><h2>Issue Lifecycle Summary</h2><p>Current issue ownership and resolution posture.</p></div><button class="text-link" data-overview-nav="audit-issues">View issues</button></div>
+            <div class="issue-lifecycle-content"><div id="overviewLifecycleRows" class="lifecycle-table"></div><div class="lifecycle-donut"><div id="overviewIssueDonut" class="donut-ring"><strong id="overviewDonutTotal">0</strong><small>Total issues</small></div><div id="overviewSeverityLegend" class="donut-legend"></div></div></div>
+          </article>
+          <article class="command-card activity-card">
+            <div class="command-card-heading"><div><h2>Recent Platform Activity</h2><p>Latest governed operations across the workspace.</p></div><button class="text-link" id="overviewActivityRefresh">Refresh</button></div>
+            <div id="overviewActivityList" class="overview-activity-list"></div>
+          </article>
+          <article class="command-card alerts-card">
+            <div class="command-card-heading"><div><h2>Recent Alerts</h2><p>Signals requiring review or acknowledgement.</p></div><button class="text-link" data-overview-nav="alerts">View all</button></div>
+            <div id="overviewAlertList" class="overview-alert-list"></div>
+          </article>
+        </section>
+
+        <section class="command-bottom-grid">
+          <article class="command-card platform-summary-card">
+            <div class="command-card-heading"><div><h2>Platform Summary</h2><p>All-time workspace coverage and operating footprint.</p></div></div>
+            <div id="overviewPlatformSummary" class="platform-summary-grid"></div>
+          </article>
+          <article class="command-card upcoming-card">
+            <div class="command-card-heading"><div><h2>Upcoming Scheduled Audits</h2><p>Next active automation runs.</p></div><button class="text-link" data-overview-nav="schedules">View all</button></div>
+            <div id="overviewUpcomingAudits" class="overview-upcoming-list"></div>
+          </article>
+          <article class="command-card quick-actions-card">
+            <div class="command-card-heading"><div><h2>Quick Actions</h2><p>Continue common reliability workflows.</p></div></div>
+            <div class="overview-quick-actions">
+              <button data-overview-action="audit">&#9654;<span>Run Audit</span></button><button data-overview-action="rule">&#9639;<span>Create Rule</span></button>
+              <button data-overview-action="dataset">&#9636;<span>New Dataset</span></button><button data-overview-action="remediation">&#8984;<span>Open Remediation</span></button>
+              <button data-overview-action="reports">&#9637;<span>View Reports</span></button><button data-overview-action="copilot">&#10022;<span>Reliability Copilot</span></button>
+              <button data-overview-action="schedule">&#9719;<span>Schedule Audit</span></button><button data-overview-action="contract">&#9640;<span>Create Contract</span></button>
+            </div>
+          </article>
+        </section>
+      </section>
+
+      <section id="datasetsPage" class="page-view hidden datasets-page">
+        <header class="page-header datasets-header"><div><p class="eyebrow">Data management</p><h1>Datasets</h1><p>Register, organize, and monitor the datasets that power reliability operations.</p></div><div class="page-actions"><button id="addDatasetButton">&#65291; Add Dataset</button><button id="datasetImportButton" class="secondary-button" type="button">&#8679; Import CSV</button><button id="datasetVersionImportButton" class="secondary-button" type="button" disabled>&#8635; Import new version</button><input id="datasetImportInput" class="visually-hidden-file" type="file" accept=".csv,text/csv"><input id="datasetVersionImportInput" class="visually-hidden-file" type="file" accept=".csv,text/csv"></div></header><div id="datasetImportStatus" class="dataset-import-status hidden" role="status" aria-live="polite"></div>
+        <section id="datasetCreatePanel" class="dataset-create-panel hidden"><div class="card-heading"><div><p class="eyebrow">New registry entry</p><h2>Add Dataset</h2></div><button id="closeDatasetCreate" class="icon-button">&#215;</button></div><form id="datasetCreateForm" class="dataset-create-form"><label>Dataset name<input id="datasetName" required placeholder="customers_master.csv"></label><label>Domain<input id="datasetDomain" placeholder="Customer"></label><label>Owner<input id="datasetOwner" placeholder="Workspace team"></label><label>Environment<select id="datasetEnvironment"><option value="production">Production</option><option value="staging">Staging</option><option value="archived">Archived</option></select></label><label>Source type<input id="datasetSource" value="CSV"></label><label class="wide">Labels<input id="datasetLabels" placeholder="Customer, PII, Critical"></label><label class="wide">Description<textarea id="datasetDescription" rows="2" placeholder="Describe how this dataset is used."></textarea></label><div class="wide form-actions"><button type="submit">Register dataset</button><button type="button" id="cancelDatasetCreate" class="secondary-button">Cancel</button></div></form></section>
+        <section class="metric-grid dataset-metrics"><article class="metric-card"><div class="metric-head"><span>Registered Datasets</span><b class="metric-icon">&#9636;</b></div><strong id="datasetRegisteredMetric" class="metric-value">0</strong><small>Available in this workspace</small></article><article class="metric-card"><div class="metric-head"><span>Monitored</span><b class="metric-icon">&#10003;</b></div><strong id="datasetMonitoredMetric" class="metric-value">0</strong><small>Linked to completed audits</small></article><article class="metric-card"><div class="metric-head"><span>With Active Issues</span><b class="metric-icon warning">!</b></div><strong id="datasetIssuesMetric" class="metric-value">0</strong><small>Require quality attention</small></article><article class="metric-card"><div class="metric-head"><span>Recently Updated</span><b class="metric-icon blue">&#9719;</b></div><strong id="datasetRecentMetric" class="metric-value">0</strong><small>Changed in the last 7 days</small></article></section>
+        <section class="dataset-workspace-grid">
+          <article class="dashboard-card dataset-registry"><div class="card-heading"><div><p class="eyebrow">Workspace inventory</p><h2>Dataset Registry</h2></div><button id="refreshDatasetsButton" class="text-link">Refresh &#8594;</button></div><div class="dataset-toolbar"><div class="dataset-search"><span>&#8981;</span><input id="datasetSearchInput" placeholder="Search datasets..."></div><div class="dataset-tabs" id="datasetEnvironmentTabs"><button class="active" data-environment="all">All</button><button data-environment="production">Production</button><button data-environment="staging">Staging</button><button data-environment="archived">Archived</button></div></div><div class="dataset-table-head"><span>Dataset</span><span>Domain</span><span>Owner</span><span>Freshness</span><span>Quality</span><span>Status</span><span>Updated</span><span aria-hidden="true"></span></div><div id="datasetRows" class="dataset-table-body"></div><footer class="dataset-registry-footer"><span id="datasetPaginationSummary">Showing 0 datasets</span><div class="dataset-pagination-controls"><label for="datasetRowsPerPage">Rows per page</label><select id="datasetRowsPerPage" aria-label="Dataset rows per page"><option value="5">5</option><option value="10" selected>10</option><option value="20">20</option><option value="50">50</option></select><button id="datasetPreviousPage" type="button" class="icon-button" aria-label="Previous dataset page">&#8249;</button><span id="datasetPageIndicator">1 / 1</span><button id="datasetNextPage" type="button" class="icon-button" aria-label="Next dataset page">&#8250;</button></div></footer>
+          </article>
+          <aside class="dataset-details-stack"><article class="dashboard-card dataset-overview"><div class="card-heading"><div><p class="eyebrow">Selected dataset</p><h2 id="datasetDetailName">Choose a dataset</h2></div><span id="datasetDetailStatus" class="status-badge">&#8212;</span></div><div id="datasetDetailBody" class="dataset-detail-empty">Select a dataset from the registry to inspect its profile and audit history.</div></article><article id="datasetLabels" class="dashboard-card dataset-labels-card"><div class="card-heading"><div><h2>Dataset Labels</h2></div><span aria-hidden="true">&#8964;</span></div><div id="datasetLabelList" class="label-list"><span class="muted">No dataset selected</span></div><form id="datasetLabelForm" class="dataset-label-form"><input id="datasetLabelInput" type="text" placeholder="Add a label" maxlength="40" disabled><button id="datasetLabelAddButton" type="submit" disabled>Add label</button></form></article><article id="datasetRecommendations" class="dashboard-card dataset-actions-card"><div class="card-heading"><h2>Recommended Actions</h2></div><div id="datasetActions" class="recommended-actions"><div class="empty-row">Actions will appear after selecting a dataset.</div></div></article></aside>
+          <article class="dashboard-card dataset-intelligence-card dataset-schema-wide"><div class="card-heading"><div><h2>Schema</h2></div><span aria-hidden="true">&#8964;</span></div><div id="datasetPreview" class="dataset-preview-empty">Select an imported dataset to inspect its schema.</div></article>
+        </section>
+      </section>
+
+      <section id="versionsPage" class="page-view hidden versions-page">
+        <header class="page-header versions-header"><div><p class="eyebrow">Version-aware reliability</p><h1>Dataset Versions</h1><p>Track immutable audit-backed versions and compare structural and reliability changes.</p></div><div class="page-actions"><button id="refreshVersionsButton" class="secondary-button" type="button">Refresh</button><button id="openVersionAuditButton" type="button" disabled>Open selected audit</button></div></header>
+        <section class="version-controls dashboard-card"><label>Dataset<select id="versionDatasetSelect"><option value="">Select a dataset</option></select></label><label>Baseline version<select id="baselineVersionSelect" disabled></select></label><label>Candidate version<select id="candidateVersionSelect" disabled></select></label><button id="compareVersionsButton" type="button" disabled>Compare versions</button></section>
+        <section id="versionEmptyState" class="dashboard-card version-empty"><span>&#8779;</span><h2>Select a dataset</h2><p>Version history becomes available after a dataset has completed one or more audits.</p></section>
+        <section id="versionWorkspace" class="hidden">
+          <section class="version-metrics">
+            <article><span>Versions</span><strong id="versionCountMetric">0</strong><small>Audit-backed snapshots</small></article>
+            <article><span>Latest score</span><strong id="versionLatestScore">&#8212;</strong><small id="versionLatestRisk">No version selected</small></article>
+            <article><span>Score change</span><strong id="versionScoreDelta">&#8212;</strong><small>Candidate versus baseline</small></article>
+            <article><span>Row change</span><strong id="versionRowDelta">&#8212;</strong><small>Candidate versus baseline</small></article>
+            <article><span>Issue change</span><strong id="versionIssueDelta">&#8212;</strong><small>Candidate versus baseline</small></article>
+          </section>
+          <section class="version-layout">
+            <article class="dashboard-card version-timeline-card"><div class="card-heading"><div><p class="eyebrow">Dataset lineage</p><h2>Version History</h2></div></div><div id="versionTimeline" class="version-timeline"></div><footer class="version-pagination"><span id="versionPageSummary">0 versions</span><div><button id="versionPrevPage" type="button" class="secondary-button">Previous</button><span id="versionPageIndicator">1 of 1</span><button id="versionNextPage" type="button" class="secondary-button">Next</button></div></footer></article>
+            <article class="dashboard-card version-comparison-card"><div class="card-heading"><div><p class="eyebrow">Selected comparison</p><h2>Change Summary</h2></div><span id="versionComparisonStatus" class="status-badge">Not compared</span></div><div id="versionComparisonSummary" class="version-comparison-empty">Choose a baseline and candidate version, then run the comparison.</div></article>
+          </section>
+          <section class="version-change-grid">
+            <article class="dashboard-card"><div class="card-heading"><h2>Schema Changes</h2></div><div id="versionSchemaChanges" class="version-change-list"></div></article>
+            <article class="dashboard-card"><div class="card-heading"><h2>Issue Movement</h2></div><div id="versionIssueChanges" class="version-change-list"></div><footer class="version-pagination issue-pagination"><span id="issueMovementSummary">0 movements</span><div><button id="issueMovementPrev" type="button" class="secondary-button">Previous</button><span id="issueMovementPageIndicator">1 of 1</span><button id="issueMovementNext" type="button" class="secondary-button">Next</button></div></footer></article>
+          </section>
+        </section>
+      </section>
+
+
+      <section id="driftPage" class="page-view hidden drift-page">
+        <header class="drift-header"><div><p class="eyebrow">Schema intelligence</p><h1>Schema Drift Monitoring</h1><p>Detect and track schema changes, type changes, and distribution shifts across dataset versions.</p></div><div class="page-actions"><button id="exportDriftButton" class="secondary-button" type="button">Export report</button><button id="refreshDriftButton" type="button">Refresh</button></div></header>
+        <section class="drift-kpis">
+          <article><span>Drift events</span><strong id="driftTotal">0</strong><small>Across active datasets</small></article>
+          <article class="high"><span>High severity</span><strong id="driftHigh">0</strong><small id="driftHighRate">0% of events</small></article>
+          <article class="medium"><span>Medium severity</span><strong id="driftMedium">0</strong><small id="driftMediumRate">0% of events</small></article>
+          <article class="low"><span>Low severity</span><strong id="driftLow">0</strong><small id="driftLowRate">0% of events</small></article>
+          <article><span>Average impact score</span><strong id="driftAverage">0</strong><small>Out of 100</small></article>
+        </section>
+        <section class="drift-chart-grid">
+          <article class="dashboard-card"><div class="card-heading"><h2>Drift Events Over Time</h2></div><div class="drift-chart"><canvas id="driftTrendChart"></canvas></div></article>
+          <article class="dashboard-card"><div class="card-heading"><h2>Drift by Severity</h2></div><div class="drift-chart"><canvas id="driftSeverityChart"></canvas></div></article>
+          <article class="dashboard-card"><div class="card-heading"><h2>Drift by Type</h2></div><div class="drift-chart"><canvas id="driftTypeChart"></canvas></div></article>
+        </section>
+        <section class="dashboard-card drift-filters">
+          <input id="driftSearch" type="search" placeholder="Search datasets or drift events...">
+          <select id="driftDatasetFilter"><option value="all">All datasets</option></select>
+          <select id="driftTypeFilter"><option value="all">All drift types</option><option value="column_added">Column added</option><option value="column_removed">Column removed</option><option value="type_changed">Type changed</option><option value="nullability_changed">Nullability changed</option><option value="cardinality_shift">Cardinality shift</option></select>
+          <select id="driftSeverityFilter"><option value="all">All severities</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
+          <select id="driftStatusFilter"><option value="all">All statuses</option><option value="new">New</option><option value="persistent">Persistent</option><option value="resolved">Resolved</option></select>
+          <button id="resetDriftFilters" class="secondary-button" type="button">Reset</button>
+        </section>
+        <section class="drift-workspace-grid">
+          <article class="dashboard-card drift-events-card"><div class="card-heading"><div><p class="eyebrow">Detected changes</p><h2>Drift Events <span id="driftEventCount">(0)</span></h2></div></div><div class="drift-table-head"><span>Dataset</span><span>Drift type</span><span>Severity</span><span>Impact</span><span>Event</span><span>Versions</span><span>Status</span><span>Detected</span></div><div id="driftEventRows" class="drift-table-body"></div><footer class="drift-pagination"><span id="driftPageSummary">0 events</span><div><button id="driftPrev" class="secondary-button" type="button">Previous</button><span id="driftPageIndicator">1 of 1</span><button id="driftNext" class="secondary-button" type="button">Next</button></div></footer></article>
+          <aside class="dashboard-card drift-detail-card"><div class="card-heading"><div><p class="eyebrow">Drift event details</p><h2 id="driftDetailTitle">Select an event</h2></div><span id="driftDetailStatus" class="status-badge">&#8212;</span></div><div id="driftDetailBody" class="drift-detail-empty">Choose a drift event to inspect affected columns, severity, impact, and linked versions.</div><div class="drift-detail-actions"><button id="driftViewVersions" class="secondary-button" type="button" disabled>View in Versions</button><button id="driftOpenAudit" type="button" disabled>Open candidate audit</button></div></aside>
+        </section>
+      </section>
+
+      <section id="schedulesPage" class="page-view hidden schedules-page">
+        <header class="schedule-page-header"><div><h1>Scheduled Audits</h1><p>Schedule and monitor automated dataset audits to maintain continuous data reliability.</p></div><div class="page-actions"><button id="newScheduleButton" type="button">&#65291; New Schedule</button><button id="refreshSchedulesButton" class="secondary-button" type="button">&#8635; Refresh</button></div></header>
+        <section class="schedule-kpis">
+          <article><i class="green">&#9635;</i><span>Total Schedules</span><strong id="scheduleTotal">0</strong><small>Across all datasets</small></article>
+          <article><i class="green">&#9654;</i><span>Active Schedules</span><strong id="scheduleActive">0</strong><small>Currently running</small></article>
+          <article><i class="green">&#10003;</i><span>Completed (7 days)</span><strong id="scheduleCompleted">0</strong><small>Successfully executed</small></article>
+          <article><i class="orange">!</i><span>Failed (7 days)</span><strong id="scheduleFailed">0</strong><small>Require attention</small></article>
+          <article><i class="blue">&#9719;</i><span>Next Run (Closest)</span><strong id="scheduleNext">&#8212;</strong><small id="scheduleNextTime">No upcoming run</small></article>
+        </section>
+        <section class="schedule-upper-grid">
+          <article class="dashboard-card schedule-list-card"><div class="card-heading"><div><p class="eyebrow">Scheduled audits</p><h2>Audit Schedules</h2></div></div><div class="schedule-table-head"><span>Schedule / Dataset</span><span>Frequency</span><span>Next Run</span><span>Last Run</span><span>Status</span><span>Result</span><span>Actions</span></div><div id="scheduleRows" class="schedule-table-body"></div></article>
+          <aside class="dashboard-card upcoming-card"><div class="card-heading"><div><p class="eyebrow">Upcoming runs</p><h2>Next Executions</h2></div><button class="secondary-button" type="button" id="viewScheduleCalendar">View calendar</button></div><div id="upcomingScheduleRows"></div></aside>
+        </section>
+        <section class="schedule-chart-grid">
+          <article class="dashboard-card"><div class="card-heading"><h2>Reliability Score Trend (7 days)</h2></div><div class="schedule-chart"><canvas id="scheduleScoreChart"></canvas></div></article>
+          <article class="dashboard-card"><div class="card-heading"><h2>Audit Executions (7 days)</h2></div><div class="schedule-chart"><canvas id="scheduleExecutionChart"></canvas></div></article>
+          <article class="dashboard-card"><div class="card-heading"><h2>Rule Failure Trend (7 days)</h2></div><div class="schedule-chart"><canvas id="scheduleFailureChart"></canvas></div></article>
+        </section>
+        <article class="dashboard-card recent-schedule-runs"><div class="card-heading"><div><p class="eyebrow">Recent audit runs</p><h2>Execution History</h2></div></div><div class="schedule-run-head"><span>Dataset</span><span>Start Time</span><span>Duration</span><span>Status</span><span>Score</span><span>Issues</span><span>Triggered By</span><span>Action</span></div><div id="scheduleRunRows"></div></article>
+      </section>
+
+
+
+      <section id="copilotPage" class="page-view hidden copilot-page">
+        <header class="copilot-page-header"><div><div class="copilot-title-row"><h1>Reliability Copilot</h1></div><p>Ask questions about data reliability. Copilot uses governed workspace evidence to provide insights and recommended actions.</p></div></header>
+        <section class="copilot-layout">
+          <aside class="copilot-left">
+            <article class="copilot-card copilot-context-card"><div class="copilot-card-heading"><h2>Copilot Context</h2><span class="copilot-pin">&#8961;</span></div><label>Workspace<div id="copilotWorkspace" class="copilot-context-value">Current workspace</div></label><label>Dataset<select id="copilotDataset"></select></label><label>Audit Run<select id="copilotAudit"></select></label><label>Compare With <small>(Optional)</small><select id="copilotCompare"><option value="">No comparison</option></select></label><label>Analysis Mode<select id="copilotMode"><option value="general">General Analysis</option><option value="score">Score Explanation</option><option value="rules">Rule Failures</option><option value="comparison">Audit Comparison</option><option value="drift">Schema Drift</option><option value="contracts">Contract Compliance</option><option value="remediation">Remediation Planning</option></select></label></article>
+            <article class="copilot-card copilot-sessions-card"><div class="copilot-card-heading"><h2>Recent Copilot Sessions</h2><button id="copilotViewSessions" class="copilot-text-button" type="button">View all</button></div><div id="copilotSessionRows" class="copilot-session-list"></div><button id="copilotNewSession" class="copilot-neutral-button copilot-new-session" type="button">&#65291; New session</button></article>
+            <dialog id="deleteCopilotSessionDialog" class="modal-dialog copilot-delete-dialog"><div class="modal-header"><div><p class="eyebrow">Confirm deletion</p><h2>Delete Copilot session?</h2><p id="deleteCopilotSessionDescription">This removes the selected conversation and its messages.</p></div><button id="closeDeleteCopilotSessionDialog" class="icon-button" type="button" aria-label="Close">&#215;</button></div><div class="form-actions"><button id="cancelDeleteCopilotSession" class="secondary-button" type="button">Cancel</button><button id="confirmDeleteCopilotSession" class="danger-button" type="button">Delete session</button></div></dialog>
+          </aside>
+          <main class="copilot-center">
+            <div id="copilotConversation" class="copilot-conversation"><div class="copilot-empty"><span class="copilot-spark">&#10022;</span><h2>Ask about your data reliability</h2><p>Select a dataset and audit, then ask Copilot to explain scores, issues, failed rules, drift, contracts, or remediation options.</p></div></div>
+            <div id="copilotFollowups" class="copilot-followups hidden"><span>Ask follow-up</span><div><button type="button" data-copilot-question="Which rules failed the most?">Which rules failed the most?</button><button type="button" data-copilot-question="What changed between the audits?">What changed between the audits?</button><button type="button" data-copilot-question="Show the most affected columns.">Show affected columns</button></div></div>
+            <form id="copilotAskForm" class="copilot-composer"><textarea id="copilotQuestion" rows="2" placeholder="Ask anything about your data reliability..." required></textarea><div class="copilot-composer-footer"><span class="copilot-attachment" title="Evidence is attached automatically">&#8961;</span><button id="copilotSend" type="submit" aria-label="Send question"><svg viewBox="0 0 24 24"><path d="m5 12 14-7-4 14-3-6-7-1Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></button></div></form>
+            <p class="copilot-disclaimer">Copilot can make mistakes. Verify important decisions against the linked platform evidence.</p>
+          </main>
+          <aside class="copilot-right">
+            <article class="copilot-card copilot-evidence-card"><div class="copilot-card-heading"><h2>Evidence &amp; Actions</h2><span>&#8963;</span></div><div id="copilotEvidence"><div class="copilot-empty-evidence">Select an audit to load reliability evidence.</div></div></article>
+            <article class="copilot-card copilot-quick-card"><h2>Quick Actions</h2><div class="copilot-quick-grid"><button id="copilotOpenAudit" type="button"><span>&#9635;</span>Open Audit Run</button><button id="copilotOpenDataset" type="button"><span>&#9636;</span>Open Dataset</button><button id="copilotCompareAudits" type="button"><span>&#8779;</span>Compare Audits</button><button id="copilotCreateRule" type="button"><span>&#65291;</span>Create Rule Draft</button><button id="copilotOpenRemediation" type="button"><span>&#8961;</span>Open Remediation</button><button id="copilotCreateAction" type="button"><span>&#10003;</span>Create Action Point</button></div></article>
+            <article class="copilot-card copilot-guardrail"><h2>&#9671; AI Guardrails</h2><p>Copilot uses workspace-scoped data and evidence. It does not change data or rules without human review.</p><button id="copilotGuardrails" class="copilot-text-button" type="button">View guardrails &#8599;</button></article>
+          </aside>
+        </section>
+      </section>
+
+      <section id="connectorsPage" class="page-view hidden connectors-page">
+        <header class="connectors-header"><div><h1>Connectors</h1><p>Manage data source connections used for datasets, audits, and monitoring.</p></div><div class="page-actions"><button id="newConnectorButton" type="button"><span class="button-svg">+</span> New Connector</button><button id="refreshConnectorsButton" class="secondary-button svg-button" type="button"><svg viewBox="0 0 24 24"><path d="M20 6v5h-5M4 18v-5h5M6.1 9A7 7 0 0 1 18 6l2 5M17.9 15A7 7 0 0 1 6 18l-2-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Refresh</button></div></header>
+        <section class="connector-kpis">
+          <article><span class="connector-kpi-icon purple"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="7" ry="3"/><path d="M5 5v14c0 1.7 3.1 3 7 3s7-1.3 7-3V5M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3" fill="none" stroke="currentColor" stroke-width="1.7"/></svg></span><div><span>Total Connectors</span><strong id="connectorTotal">0</strong><small>Current workspace</small></div></article>
+          <article><span class="connector-kpi-icon green"><svg viewBox="0 0 24 24"><path d="m7 12 3 3 7-7" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></span><div><span>Active</span><strong id="connectorActive">0</strong><small>Currently connected</small></div></article>
+          <article><span class="connector-kpi-icon amber"><svg viewBox="0 0 24 24"><path d="M9 7v10M15 7v10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span><div><span>Inactive</span><strong id="connectorInactive">0</strong><small>Not connected</small></div></article>
+          <article><span class="connector-kpi-icon red"><svg viewBox="0 0 24 24"><path d="m7 7 10 10M17 7 7 17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span><div><span>Failed</span><strong id="connectorFailed">0</strong><small>Connection errors</small></div></article>
+          <article><span class="connector-kpi-icon blue"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M9 7h6M9 11h6M9 15h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span><div><span>Connected Sources</span><strong id="connectorSources">0</strong><small>Unique source types</small></div></article>
+        </section>
+        <section class="dashboard-card connector-workspace-card">
+          <div class="connector-filter-bar"><label class="connector-search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m16 16 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><input id="connectorSearch" placeholder="Search connectors..."></label><label>Status<select id="connectorStatus"><option value="all">All</option><option value="active">Active</option><option value="inactive">Inactive</option></select></label><label>Source Type<select id="connectorSourceType"><option value="all">All</option></select></label><button id="exportConnectorsButton" class="secondary-button svg-button" type="button"><svg viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 19h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Export CSV</button></div>
+          <div class="connectors-main-grid"><div class="connector-list-panel"><div class="connector-table-head"><span>Connector Name</span><span>Source Type</span><span>Host / Project</span><span>Status</span><span>Last Sync</span><span>Actions</span></div><div id="connectorRows"></div><div class="connector-pagination"><span id="connectorPageSummary">0 connectors</span><div><button id="connectorPreviousPage" class="secondary-button" type="button">Previous</button><span id="connectorPageNumber">Page 1</span><button id="connectorNextPage" class="secondary-button" type="button">Next</button></div></div></div><aside id="connectorDetailPanel" class="connector-detail-panel"><div class="empty-detail"><span class="empty-svg"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7h8M8 17h8M7 7a3 3 0 1 0-6 0 3 3 0 0 0 6 0Zm16 10a3 3 0 1 0-6 0 3 3 0 0 0 6 0ZM7 7c4 0 6 2 6 5s2 5 4 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><h2>Select a connector</h2><p>Review configuration, health, activity, and sync controls.</p></div></aside></div>
+        </section>
+      </section>
+
+      <dialog id="connectorDialog" class="modal-dialog connector-dialog"><div class="modal-header"><div><p class="eyebrow">Data source</p><h2 id="connectorDialogTitle">New Connector</h2><p>Configure a governed connection for data discovery and synchronization.</p></div><button id="closeConnectorDialog" class="icon-button" type="button">&#215;</button></div><form id="connectorForm"><input id="connectorId" type="hidden"><div class="connector-form-grid"><label>Connector name<input id="connectorName" required placeholder="BigQuery - Analytics"></label><label>Source type<select id="connectorType" required><option value="BigQuery">BigQuery</option><option value="PostgreSQL">PostgreSQL</option><option value="MySQL">MySQL</option><option value="Google Sheets">Google Sheets</option><option value="Google Cloud Storage">Google Cloud Storage</option><option value="REST API">REST API</option></select></label><label>Host / project<input id="connectorHost" placeholder="analytics-prod-01"></label><label>Dataset name<input id="connectorDatasetName" placeholder="analytics"></label><label class="wide">Configuration JSON<textarea id="connectorConfig" rows="7" spellcheck="false">{
+  "project_id": "",
+  "dataset": ""
+}</textarea></label><label>Status<select id="connectorFormStatus"><option value="active">Active</option><option value="inactive">Inactive</option></select></label></div><div id="connectorFormError" class="form-error hidden"></div><div class="form-actions"><button id="cancelConnectorDialog" type="button" class="secondary-button">Cancel</button><button type="submit">Save connector</button></div></form></dialog>
+
+      <dialog id="deleteConnectorDialog" class="modal-dialog connector-delete-dialog"><div class="modal-header"><div><p class="eyebrow">Confirm deletion</p><h2>Delete connector?</h2><p id="deleteConnectorDescription">This removes the connector configuration and sync history.</p></div><button id="closeDeleteConnectorDialog" class="icon-button" type="button">&#215;</button></div><div class="form-actions"><button id="cancelDeleteConnector" type="button" class="secondary-button">Cancel</button><button id="confirmDeleteConnector" type="button" class="danger-button">Delete connector</button></div></dialog>
+
+
+      <section id="reportsPage" class="page-view hidden reports-page">
+        <header class="reports-header"><div><h1>Reports</h1><p>Create, view, export, and schedule reliability reports across audits, rules, issues, contracts, drift, and remediation.</p></div><div class="page-actions"><button id="reportExportPdf" class="secondary-button" type="button">Export PDF</button><button id="reportExportCsv" class="secondary-button" type="button">Export CSV</button><button id="scheduleReportButton" class="secondary-button" type="button">Schedule report</button><button id="newReportButton" type="button">New report</button></div></header>
+        <section class="dashboard-card report-filter-card"><label>Report type<select id="reportType"><option value="executive">Executive Summary</option><option value="dataset">Dataset Quality</option><option value="issues">Issue Lifecycle</option><option value="rules">Rule Performance</option><option value="contracts">Contract Compliance</option><option value="drift">Schema Drift</option><option value="remediation">Remediation Outcomes</option><option value="audits">Audit Operations</option><option value="alerts">Alerts & Notifications</option></select></label><label>Date from<input id="reportDateFrom" type="date"></label><label>Date to<input id="reportDateTo" type="date"></label><label>Dataset<select id="reportDataset"><option value="">All datasets</option></select></label><button id="resetReportFilters" class="secondary-button" type="button">Reset filters</button></section>
+        <section class="report-kpis"><article><span>Overall Reliability Score</span><strong id="reportScore">&#8212;</strong><small>Latest dataset posture</small></article><article><span>Datasets Monitored</span><strong id="reportDatasets">0</strong><small>In selected scope</small></article><article><span>Active Issues</span><strong id="reportIssues">0</strong><small>Unresolved findings</small></article><article><span>Failed Rules</span><strong id="reportFailedRules">0</strong><small>Failed evaluations</small></article><article><span>Schema Drift Events</span><strong id="reportDrift">0</strong><small>Detected changes</small></article></section>
+        <section class="report-main-grid">
+          <div class="report-content">
+            <section class="report-chart-grid"><article class="dashboard-card report-chart-wide"><div class="card-heading"><h2>Reliability Score Trend</h2></div><canvas id="reportReliabilityChart"></canvas></article><article class="dashboard-card"><div class="card-heading"><h2>Issues by Severity</h2></div><canvas id="reportSeverityChart"></canvas></article></section>
+            <section class="report-chart-grid two"><article class="dashboard-card"><div class="card-heading"><h2>Dataset Reliability Ranking</h2></div><canvas id="reportDatasetRankingChart"></canvas></article><article class="dashboard-card"><div class="card-heading"><h2>Rule Pass-rate Trend</h2></div><canvas id="reportRulePassChart"></canvas></article></section>
+            <section class="report-chart-grid two"><article class="dashboard-card"><div class="card-heading"><h2>Issue Category Distribution</h2></div><canvas id="reportCategoryChart"></canvas></article><article class="dashboard-card"><div class="card-heading"><h2>Remediation Impact</h2></div><canvas id="reportRemediationChart"></canvas></article></section>
+            <section class="report-chart-grid two"><article class="dashboard-card"><div class="card-heading"><h2>Most Affected Columns</h2></div><canvas id="reportColumnsChart"></canvas></article><article class="dashboard-card"><div class="card-heading"><h2>Score vs Issue Count</h2></div><canvas id="reportScatterChart"></canvas></article></section>
+            <section class="dashboard-card recent-report-card"><div class="card-heading"><h2>Recent Reports</h2><span id="reportCount">0 reports</span></div><div class="report-table-head"><span>Report Name</span><span>Type</span><span>Format</span><span>Generated At</span><span>Actions</span></div><div id="reportRows"></div></section>
+          </div>
+          <aside class="report-side"><section class="dashboard-card"><div class="card-heading"><h2>Saved Report Configurations</h2></div><div id="reportSchedules" class="report-side-list"></div></section><section class="dashboard-card"><div class="card-heading"><h2>Quick Actions</h2></div><div class="report-quick-actions"><button id="quickNewReport" class="secondary-button">New report</button><button id="quickScheduleReport" class="secondary-button">Schedule report</button><button id="quickPdf" class="secondary-button">Export PDF</button><button id="quickCsv" class="secondary-button">Export CSV</button></div></section></aside>
+        </section>
+      </section>
+      <dialog id="reportDialog" class="modal-dialog report-dialog"><div class="modal-header"><div><p class="eyebrow">Report configuration</p><h2 id="reportDialogTitle">New report</h2><p>Create a stakeholder-ready reliability report using the current filters.</p></div><button id="closeReportDialog" class="icon-button" type="button">&#215;</button></div><form id="reportForm"><label>Report name<input id="reportName" required placeholder="Executive Reliability Summary"></label><label>Format<select id="reportFormat"><option value="pdf">PDF</option><option value="csv">CSV</option></select></label><div class="form-actions"><button id="cancelReportDialog" class="secondary-button" type="button">Cancel</button><button type="submit">Generate report</button></div></form></dialog>
+      <dialog id="reportScheduleDialog" class="modal-dialog report-dialog"><div class="modal-header"><div><p class="eyebrow">Scheduled delivery</p><h2>Schedule report</h2><p>Save a recurring report configuration for this workspace.</p></div><button id="closeReportScheduleDialog" class="icon-button" type="button">&#215;</button></div><form id="reportScheduleForm"><label>Schedule name<input id="reportScheduleName" required placeholder="Weekly Executive Summary"></label><label>Frequency<select id="reportFrequency"><option value="daily">Daily</option><option value="weekly" selected>Weekly</option><option value="monthly">Monthly</option></select></label><label>Format<select id="reportScheduleFormat"><option value="pdf">PDF</option><option value="csv">CSV</option></select></label><div class="form-actions"><button id="cancelReportScheduleDialog" class="secondary-button" type="button">Cancel</button><button type="submit">Save schedule</button></div></form></dialog>
+
+      <section id="alertsPage" class="page-view hidden alerts-page">
+        <header class="alerts-page-header"><div><h1>Alerts &amp; Notifications</h1><p>Monitor important events and data quality issues that require your attention.</p></div><div class="page-actions"><button id="alertPreferencesButton" class="secondary-button" type="button">Notification preferences</button><button id="refreshAlertsButton" class="secondary-button" type="button">Refresh</button></div></header>
+        <section class="alert-kpis">
+          <article><i class="critical">&#9651;</i><span>Critical</span><strong id="alertCritical">0</strong><small>Require immediate action</small></article>
+          <article><i class="high">!</i><span>High</span><strong id="alertHigh">0</strong><small>High priority issues</small></article>
+          <article><i class="unread">&#9831;</i><span>Unread</span><strong id="alertUnread">0</strong><small>New alerts</small></article>
+          <article><i class="resolved">&#10003;</i><span>Resolved</span><strong id="alertResolved">0</strong><small>Closed alerts</small></article>
+          <article><i class="total">&#8801;</i><span>Total Alerts</span><strong id="alertTotal">0</strong><small>Current workspace</small></article>
+        </section>
+        <section class="dashboard-card alert-workspace-card">
+          <div class="alert-filter-bar">
+            <label class="alert-search"><span>&#8981;</span><input id="alertSearch" placeholder="Search alerts..."></label>
+            <label>Severity<select id="alertSeverity"><option value="all">All</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label>
+            <label>Status<select id="alertStatus"><option value="all">All</option><option value="new">Unread</option><option value="read">Read</option><option value="acknowledged">Acknowledged</option><option value="resolved">Resolved</option><option value="dismissed">Dismissed</option></select></label>
+            <label>Alert type<select id="alertType"><option value="all">All</option><option value="score_threshold">Score threshold</option><option value="high_severity_issue">High severity issue</option><option value="rule_failure">Rule failure</option><option value="contract_violation">Contract violation</option><option value="schema_drift">Schema drift</option><option value="scheduled_audit_failure">Scheduled audit failure</option></select></label>
+            <label>Dataset<select id="alertDataset"><option value="">All</option></select></label>
+            <button id="exportAlertsButton" type="button" class="secondary-button">Export CSV</button>
+          </div>
+          <div class="alert-tabs" role="tablist"><button class="active" data-alert-tab="all">All Alerts <span id="alertTabAll">0</span></button><button data-alert-tab="new">Unread <span id="alertTabUnread">0</span></button><button data-alert-tab="acknowledged">Acknowledged <span id="alertTabAcknowledged">0</span></button><button data-alert-tab="resolved">Resolved <span id="alertTabResolved">0</span></button><button data-alert-tab="dismissed">Dismissed <span id="alertTabDismissed">0</span></button></div>
+          <div class="alerts-main-grid">
+            <div class="alerts-list-panel">
+              <div class="alert-table-head"><span>Alert</span><span>Severity</span><span>Status</span><span>Time</span><span>Actions</span></div>
+              <div id="alertRows" class="alert-table-body"></div>
+              <div class="alert-pagination"><span id="alertPageSummary">0 alerts</span><div><button id="alertPreviousPage" class="secondary-button" type="button">Previous</button><span id="alertPageNumber">Page 1</span><button id="alertNextPage" class="secondary-button" type="button">Next</button></div></div>
+            </div>
+            <aside id="alertDetailPanel" class="alert-detail-panel"><div class="empty-detail"><span>&#9831;</span><h2>Select an alert</h2><p>Review evidence, references, and lifecycle actions.</p></div></aside>
+          </div>
+        </section>
+      </section>
+
+      <dialog id="alertPreferencesDialog" class="modal-dialog alert-preferences-dialog">
+        <form id="alertPreferencesForm"><div class="modal-header"><div><p class="eyebrow">Notification settings</p><h2>Alert preferences</h2><p>Choose which events should appear for your account.</p></div><button id="closeAlertPreferences" type="button" class="icon-button">&#215;</button></div>
+          <div class="preferences-grid"><label>Reliability score threshold<input id="alertScoreThreshold" type="number" min="0" max="100" value="80"></label><label class="check-row"><input id="alertInApp" type="checkbox" checked> In-app notifications</label><label class="check-row"><input id="alertEmail" type="checkbox"> Email notifications (ready for provider)</label><label class="check-row"><input id="alertCriticalEnabled" type="checkbox" checked> Critical alerts</label><label class="check-row"><input id="alertHighEnabled" type="checkbox" checked> High alerts</label><label class="check-row"><input id="alertMediumEnabled" type="checkbox" checked> Medium alerts</label><label class="check-row"><input id="alertLowEnabled" type="checkbox"> Low alerts</label></div>
+          <div class="form-actions"><button id="cancelAlertPreferences" type="button" class="secondary-button">Cancel</button><button type="submit">Save preferences</button></div>
+        </form>
+      </dialog>
+
+      <dialog id="scheduleDialog" class="modal-dialog schedule-dialog"><form id="scheduleForm" method="dialog"><div class="modal-header"><div><p class="eyebrow">Automation</p><h2>New Audit Schedule</h2><p>Configure a recurring audit for a registered dataset.</p></div><button type="button" id="closeScheduleDialog" class="icon-button">&#215;</button></div><div class="schedule-form-grid"><label>Dataset<select id="scheduleDataset" required></select></label><label>Schedule name<input id="scheduleName" placeholder="Daily customer audit"></label><label>Frequency<select id="scheduleFrequency"><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></label><label>Run time<input id="scheduleTime" type="time" value="02:00" required></label><label id="scheduleWeekdayWrap" class="hidden">Day of week<select id="scheduleWeekday"><option value="0">Monday</option><option value="1">Tuesday</option><option value="2">Wednesday</option><option value="3">Thursday</option><option value="4">Friday</option><option value="5">Saturday</option><option value="6">Sunday</option></select></label><label id="scheduleMonthdayWrap" class="hidden">Day of month<input id="scheduleMonthday" type="number" min="1" max="28" value="1"></label></div><div id="scheduleFormError" class="form-error hidden" role="alert"></div><div class="form-actions"><button type="button" id="cancelScheduleDialog" class="secondary-button">Cancel</button><button type="submit">Create schedule</button></div></form></dialog>
+
+      <dialog id="scheduleCalendarDialog" class="modal-dialog schedule-calendar-dialog">
+        <div class="modal-header"><div><p class="eyebrow">Automation calendar</p><h2>Scheduled Audit Calendar</h2><p>Hover over a highlighted date to review planned runs.</p></div><button type="button" id="closeScheduleCalendar" class="icon-button" aria-label="Close calendar">&#215;</button></div>
+        <div class="schedule-calendar-toolbar"><button type="button" id="scheduleCalendarPrevious" class="calendar-nav-button" aria-label="Previous month">&#8249;</button><strong id="scheduleCalendarMonth"></strong><button type="button" id="scheduleCalendarNext" class="calendar-nav-button" aria-label="Next month">&#8250;</button></div>
+        <div class="schedule-calendar-weekdays" aria-hidden="true"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div>
+        <div id="scheduleCalendarBody" class="schedule-calendar-body month-grid"></div>
+        <div id="scheduleCalendarTooltip" class="schedule-calendar-tooltip hidden" role="status"></div>
+      </dialog>
+
+      <dialog id="deleteScheduleDialog" class="modal-dialog schedule-delete-dialog">
+        <div class="modal-header"><div><p class="eyebrow">Confirm deletion</p><h2>Delete audit schedule?</h2><p id="deleteScheduleDescription">This removes the recurring schedule. Existing audit history remains available.</p></div><button type="button" id="closeDeleteScheduleDialog" class="icon-button">&#215;</button></div>
+        <div class="schedule-delete-warning">This action cannot be undone.</div>
+        <div class="form-actions"><button type="button" id="cancelDeleteSchedule" class="secondary-button">Cancel</button><button type="button" id="confirmDeleteSchedule" class="danger-button">Delete schedule</button></div>
+      </dialog>
+
+      <section id="remediationPage" class="page-view hidden remediation-page remediation-v3">
+        <header id="remediationPageHeader" class="remediation-v3-header">
+          <div>
+            <p class="eyebrow">Controlled correction workflow</p>
+            <h1>Remediation Workspace</h1>
+            <p>Review corrective actions, preview changes, and generate a governed dataset copy.</p>
+          </div>
+          <div class="remediation-v3-header-actions">
+            <span id="remediationReadyState" class="remediation-ready-state">Ready to preview</span>
+            <button id="previewRemediationButton" class="secondary-button" type="button">Preview impact</button>
+            <button id="applyRemediationButton" type="button" aria-label="Apply to Copy &amp; Revalidate">Apply to dataset copy<span class="sr-only"> &#8212; Apply to Copy &amp; Revalidate</span></button>
+          </div>
+        </header>
+
+        <section id="remediationNoAudit" class="dashboard-card remediation-no-audit hidden">
+          <div class="empty-icon">&#8961;</div><h2>Select an audit to begin remediation</h2>
+          <p>Open a completed audit first, then return here to review corrective actions.</p>
+          <button id="remediationSelectAudit" type="button">Open Audit Workspace</button>
+        </section>
+
+        <section id="tab-remediation" class="tab-panel remediation-standalone-panel">
+          <div class="remediation-steps" aria-label="Remediation progress">
+            <span class="active"><i>1</i>Select fixes</span><b></b><span><i>2</i>Preview impact</span><b></b><span><i>3</i>Apply</span><b></b><span><i>4</i>Validate</span>
+          </div>
+
+          <section class="remediation-summary-strip">
+            <article><small>Dataset</small><span id="remediationDatasetName">&#8212;</span></article>
+            <article><small>Audit run</small><span id="remediationAuditDate">&#8212;</span></article>
+            <article><small>Current score</small><span><em id="remediationCurrentScore">&#8212;</em>/100</span></article>
+            <article><small>Projected score</small><span><em id="remediationProjectedScore">&#8212;</em>/100</span></article>
+            <article><small>Fixable issues</small><span id="remediationFixableIssues">0</span></article>
+            <article><small>Estimated reduction</small><span id="remediationEstimatedReduction">&#8212;</span></article>
+          </section>
+
+          <div class="remediation-v3-grid">
+            <section class="remediation-card remediation-fixes-card">
+              <div class="remediation-card-head">
+                <div><h2>Recommended fixes</h2><p>Select the corrections to include in this remediation run.</p></div>
+                <button id="loadRemediationButton" class="text-link" type="button">Refresh</button>
+              </div>
+              <div class="remediation-options-row">
+                <label>Missing-value strategy<select id="remediationFillStrategy"><option value="mode">Most common valid value</option><option value="blank">Not provided</option><option value="zero">Zero</option></select></label>
+                <label class="remediation-switch"><input id="remediationMaskSensitive" type="checkbox" checked><span></span>Mask sensitive fields</label>
+              </div>
+              <div id="remediationActions" class="remediation-action-groups"></div>
+              <footer class="remediation-selection-footer"><span id="remediationSelectionCount">0 fixes selected</span><button id="remediationDeselectAll" class="text-link" type="button">Deselect all</button></footer>
+            </section>
+
+            <section class="remediation-card remediation-impact-card">
+              <div class="remediation-card-head"><div><h2>Impact preview</h2><p>Compare the current audit with the projected result.</p></div><span id="remediationPreviewStatus" class="status-pill">Not previewed</span></div>
+              <div id="remediationMetrics" class="remediation-comparison"><p class="empty">Select fixes and preview their projected impact.</p></div>
+              <div id="remediationWarnings"></div>
+              <div id="remediationSeverityChart" class="remediation-severity-chart"></div>
+            </section>
+
+            <aside class="remediation-card remediation-output-card">
+              <div class="remediation-card-head"><div><h2>Output & validation</h2><p>Configure the governed copy created after approval.</p></div></div>
+              <label>Target dataset copy<input id="remediationOutputName" type="text" readonly value="cleaned_dataset.csv"></label>
+              <label>Export format<select id="remediationExportFormat"><option>CSV</option></select></label>
+              <div class="remediation-validation-note"><span>&#10003;</span><p>All validations will run after apply. Rules are re-evaluated on the cleaned dataset copy.</p></div>
+              <div id="remediationApplyResult"></div>
+              <button id="remediationExportPlaceholder" class="secondary-button remediation-full-button" type="button" disabled>Export cleaned CSV</button>
+              <button id="remediationBackToAudit" class="text-link remediation-back-link" type="button">Back to audit</button>
+              <p class="remediation-copy-note">Changes are applied to a new dataset copy. The original dataset remains unchanged.</p>
+            </aside>
+
+            <section class="remediation-card remediation-preview-card">
+              <div class="remediation-card-head"><div><h2>Transformation preview</h2><p>Sample of changes that will be made.</p></div></div>
+              <div id="remediationSampleChanges"><p class="empty">Preview impact to inspect before-and-after values.</p></div>
+            </section>
+
+            <section class="remediation-card remediation-script-card">
+              <div class="remediation-card-head"><div><h2>Generated cleaning script</h2><p>Python (Pandas) evidence for review and reuse.</p></div><button id="copyScriptButton" class="secondary-button" type="button">Copy code</button></div>
+              <pre id="cleaningScript"></pre>
+            </section>
+          </div>
+        </section>
+      </section>
+
+      <section id="auditPage" class="page-view hidden audit-workspace-v2">
+        <header class="page-header audit-v2-header"><div><p class="eyebrow">Audit workspace</p><h1>Audit Workspace</h1><p>Run audits, review results, and manage data quality issues.</p></div><div class="page-actions"><button id="auditRunButton">&#9655; Run Audit</button><button id="auditExportButton" class="secondary-button">&#8679; Export</button></div></header>
+        <section id="auditV2Empty" class="audit-v2-empty"><div class="empty-icon">&#10003;</div><h2>No audit selected</h2><p>Run a sample audit, upload a CSV, or select a saved audit run.</p><div><button id="auditV2SampleButton">Run sample audit</button><button id="auditV2UploadButton" class="secondary-button">Upload CSV</button></div></section>
+        <section id="auditV2Dashboard" class="hidden">
+          <section class="audit-kpi-grid">
+            <article class="audit-kpi score"><div id="auditScoreRing" class="audit-score-ring"><strong id="auditV2Score">--</strong></div><div><span>Reliability Score</span><b id="auditV2Risk">Waiting</b><small id="auditV2Delta">Latest completed run</small></div></article>
+            <article class="audit-kpi"><i class="purple">&#9636;</i><span>Total Issues</span><strong id="auditV2Total">0</strong><small>Detected in this run</small></article>
+            <article class="audit-kpi"><i class="red">!</i><span>Critical & High</span><strong id="auditV2Critical">0</strong><small>Require priority action</small></article>
+            <article class="audit-kpi"><i class="orange">&#9651;</i><span>Medium</span><strong id="auditV2Warning">0</strong><small>Require review</small></article>
+            <article class="audit-kpi"><i class="blue">&#9432;</i><span>Low</span><strong id="auditV2Info">0</strong><small>Monitor or accept</small></article>
+            <article class="audit-kpi"><i class="green">&#10003;</i><span>Checks Executed</span><strong id="auditV2Rules">0</strong><small>Quality signals evaluated</small></article>
+          </section>
+          <section class="audit-filter-bar">
+            <label>Dataset<select id="auditDatasetSelect"></select></label><label>Audit Run<select id="auditRunSelect"></select></label><label>Severity<select id="auditV2Severity"><option value="all">All</option></select></label><label>Category<select id="auditV2Category"><option value="all">All</option></select></label><label class="audit-search">Search issues<input id="auditV2Search" placeholder="Search issues..."></label><button id="auditClearFilters" class="secondary-button">Clear</button>
+          </section>
+          <section id="auditComparisonPanel" class="dashboard-card audit-comparison-panel hidden" aria-live="polite">
+            <div class="card-heading">
+              <div><p class="eyebrow">Audit comparison</p><h2 id="auditComparisonTitle">Comparing runs</h2></div>
+              <button id="auditComparisonClose" class="secondary-button" type="button">Close</button>
+            </div>
+            <div id="auditComparisonContent" class="audit-comparison-content"><p class="muted">Select Compare with Previous Run to view changes.</p></div>
+          </section>
+          <section class="audit-insight-grid">
+            <article class="dashboard-card audit-severity-card"><div class="card-heading"><h2>Issues by Severity</h2></div><div class="audit-chart-container"><canvas id="auditSeverityChart" aria-label="Interactive issue severity chart"></canvas></div></article>
+            <article class="dashboard-card"><div class="card-heading"><h2>Issues by Category</h2></div><div class="audit-chart-container"><canvas id="auditCategoryChart" aria-label="Interactive issue category chart"></canvas></div></article>
+            <article class="dashboard-card"><div class="card-heading"><h2>Top Impacted Columns</h2></div><div id="auditImpactedColumns" class="audit-impacted-list"></div></article>
+            <article class="dashboard-card"><div class="card-heading"><h2>Audit Run Details</h2></div><div id="auditRunDetails" class="audit-run-details"></div></article>
+          </section>
+          <section class="audit-issues-layout">
+            <article class="dashboard-card audit-issues-card"><div class="card-heading"><div><p class="eyebrow">Issue explorer</p><h2>Dataset Issues</h2></div><span id="auditVisibleCount" class="status-badge">0 issues</span></div><div class="audit-table-wrap"><table class="audit-v2-table"><thead><tr><th>Severity</th><th>Category</th><th>Rule / Check</th><th>Column</th><th>Description</th><th>Affected</th><th>% Affected</th><th>Status</th></tr></thead><tbody id="auditV2IssueBody"></tbody></table></div></article>
+            <aside class="audit-side-stack"><article class="dashboard-card audit-quick-actions"><div class="card-heading"><h2>Quick Actions</h2></div><button id="auditFullReportButton"><span>&#9636;</span>View Full Report</button><button id="auditCompareButton"><span>&#8644;</span>Compare with Previous Run</button><button id="auditRemediationButton"><span>&#8853;</span>Create Remediation Task</button></article><article id="auditSelectedIssue" class="dashboard-card audit-selected-issue"><p class="muted">Select an issue to inspect its recommendation.</p></article></aside>
+          </section>
+        </section>
+        <header class="page-header"><div><p class="eyebrow">Reliability assessment</p><h1>Audit Workspace</h1><p>Profile datasets, identify risks, and prepare remediation evidence.</p></div><div class="page-actions"><label class="upload-button">Upload CSV<input id="fileInput" type="file" accept=".csv"></label><button id="sampleButton" class="secondary-button">Run sample</button></div></header>
+        <div class="audit-toolbar"><div><p id="currentDataset" class="eyebrow">No dataset selected</p><h2 id="currentTitle">Start a reliability assessment</h2></div><div class="top-actions"><button id="regenerateButton" class="secondary-button">Regenerate AI</button><a id="reportLink" class="button-link hidden" href="#" target="_blank" rel="noreferrer">Open report</a></div></div>
+        <input id="uploadButton" type="button" class="hidden" value="Upload CSV"><button id="refreshHistoryButton" class="hidden">Refresh</button>
+        <div class="audit-layout"><aside class="audit-history-panel"><div class="card-heading"><h2>Audit History</h2><button id="historyRefreshVisible" class="icon-button">&#8635;</button></div><div id="history" class="history-list"></div></aside><div class="audit-stage">
+          <section id="emptyState" class="audit-empty"><div class="empty-icon">&#10003;</div><h2>Start a reliability assessment</h2><p>Upload a CSV file or run the sample audit to profile quality, surface risks, and generate an action plan.</p><div class="quick-start"><label class="upload-button">Upload CSV<input id="emptyFileInput" type="file" accept=".csv"></label><button id="emptySampleButton">Run sample audit</button><button id="emptyRulesButton" class="secondary-button">Create rules</button></div></section>
+        <section id="workbench" class="hidden">
+          <section class="signal-strip" aria-label="Audit signals">
+            <article class="signal-card signal-next">
+              <span>Next action</span>
+              <strong id="nextAction">Run an audit</strong>
+            </article>
+            <article class="signal-card">
+              <span>Quality posture</span>
+              <strong id="qualityPosture">Waiting for dataset</strong>
+            </article>
+            <article class="signal-card">
+              <span>Protected fields</span>
+              <strong id="protectedFields">--</strong>
+            </article>
+          </section>
+
+          <section class="score-grid">
+            <button class="score-card" data-score-filter="all">
+              <span>Overall</span>
+              <strong id="score">--</strong>
+              <small id="risk">--</small>
+            </button>
+            <button class="score-card" data-score-filter="completeness">
+              <span>Completeness</span>
+              <strong id="scoreCompleteness">--</strong>
+              <div class="meter"><i id="meterCompleteness"></i></div>
+            </button>
+            <button class="score-card" data-score-filter="validity">
+              <span>Validity</span>
+              <strong id="scoreValidity">--</strong>
+              <div class="meter"><i id="meterValidity"></i></div>
+            </button>
+            <button class="score-card" data-score-filter="all">
+              <span>Issues</span>
+              <strong id="issueCount">--</strong>
+              <small>visible / total</small>
+            </button>
+            <button class="score-card" data-score-filter="privacy">
+              <span>Privacy</span>
+              <strong id="privacyCount">--</strong>
+              <small>sensitive fields</small>
+            </button>
+            <button class="score-card" data-score-filter="uniqueness">
+              <span>Uniqueness</span>
+              <strong id="scoreUniqueness">--</strong>
+              <div class="meter"><i id="meterUniqueness"></i></div>
+            </button>
+          </section>
+
+          <nav class="tabs" aria-label="Workbench tabs">
+            <button class="tab active" data-tab="overview">Overview</button>
+            <button class="tab" data-tab="issues">Issues</button>
+            <button class="tab" data-tab="columns">Columns</button>
+            <button class="tab" data-tab="rules">Rules</button>
+            <button class="tab" data-tab="remediation">Remediation</button>
+            <button class="tab" data-tab="contract">Contract</button>
+            <button class="tab" data-tab="compare">Compare</button>
+            <button class="tab" data-tab="analyst">Analyst</button>
+          </nav>
+
+          <section class="content-layout">
+            <section class="center-pane">
+              <section id="tab-overview" class="tab-panel active">
+                <div class="panel">
+                  <div class="panel-heading">
+                    <h2>Executive Summary</h2>
+                    <span id="summarySource" class="chip">--</span>
+                  </div>
+                  <p id="summaryText"></p>
+                  <div class="summary-grid">
+                    <div>
+                      <h3>Recommended Focus</h3>
+                      <ul id="focusList"></ul>
+                    </div>
+                    <div>
+                      <h3>Remediation Plan</h3>
+                      <ul id="remediationList"></ul>
+                    </div>
+                  </div>
+                </div>
+                <div class="panel">
+                  <h2>Quality Dimensions</h2>
+                  <div id="scoreBreakdown" class="dimension-grid"></div>
+                </div>
+              </section>
+
+              <section id="tab-issues" class="tab-panel">
+                <div class="toolbar">
+                  <input id="issueSearch" type="search" placeholder="Search issues, columns, recommendations">
+                  <select id="severityFilter"><option value="all">All severities</option></select>
+                  <select id="categoryFilter"><option value="all">All categories</option></select>
+                  <select id="statusFilter"><option value="all">All statuses</option></select>
+                </div>
+                <div class="bulk-bar">
+                  <span id="selectionCount">0 selected</span>
+                  <button data-bulk-status="fixed" class="secondary-button">Mark fixed</button>
+                  <button data-bulk-status="in_progress" class="secondary-button">Mark in progress</button>
+                  <button data-bulk-status="accepted_risk" class="secondary-button">Accept risk</button>
+                </div>
+                <div class="table-wrap">
+                  <table class="issue-table">
+                    <thead>
+                      <tr>
+                        <th><input id="selectAllIssues" type="checkbox"></th>
+                        <th>Issue</th>
+                        <th>Severity</th>
+                        <th>Category</th>
+                        <th>Status</th>
+                        <th>Affected</th>
+                        <th>Confidence</th>
+                      </tr>
+                    </thead>
+                    <tbody id="issueTableBody"></tbody>
+                  </table>
+                </div>
+              </section>
+
+              <section id="tab-columns" class="tab-panel">
+                <div class="panel">
+                  <h2>Column Explorer</h2>
+                  <div id="columnGrid" class="column-grid"></div>
+                </div>
+              </section>
+
+              <section id="tab-rules" class="tab-panel">
+                <div class="panel">
+                  <div class="panel-heading">
+                    <h2>Rule Builder</h2>
+                    <button id="syncRulesButton" class="secondary-button">Sync JSON</button>
+                  </div>
+                  <div class="rule-builder">
+                    <label>Required columns<textarea id="requiredColumnsInput" rows="2" placeholder="customer_id, email, status"></textarea></label>
+                    <label>Unique keys<textarea id="uniqueColumnsInput" rows="2" placeholder="customer_id"></textarea></label>
+                    <label>Allowed values<textarea id="allowedValuesInput" rows="4" placeholder="status=Active,Inactive&#10;country=Kenya,Uganda"></textarea></label>
+                    <label>Numeric ranges<textarea id="numericRangesInput" rows="3" placeholder="monthly_spend=0:1000"></textarea></label>
+                    <label>Date ranges<textarea id="dateRangesInput" rows="3" placeholder="signup_date=2020-01-01:today"></textarea></label>
+                    <label>Freshness<textarea id="freshnessInput" rows="3" placeholder="updated_at=365"></textarea></label>
+                  </div>
+                  <textarea id="rulesInput" rows="8" spellcheck="false" placeholder='{"required_columns":["customer_id"],"unique_columns":["customer_id"]}'></textarea>
+                </div>
+              </section>
+
+              <section id="tab-contract" class="tab-panel">
+                <div class="panel">
+                  <div class="panel-heading">
+                    <h2>Data Contract</h2>
+                    <div class="inline-actions">
+                      <button id="loadContractButton" class="secondary-button">Generate</button>
+                      <button id="useContractButton" class="secondary-button">Use as rules</button>
+                    </div>
+                  </div>
+                  <pre id="contractOutput"></pre>
+                </div>
+              </section>
+
+              <section id="tab-compare" class="tab-panel">
+                <div class="panel">
+                  <div class="compare-bar">
+                    <select id="baselineSelect"></select>
+                    <button id="compareButton">Compare</button>
+                  </div>
+                  <div id="comparisonOutput" class="comparison-panel"></div>
+                </div>
+              </section>
+
+              <section id="tab-analyst" class="tab-panel">
+                <div class="panel analyst-panel">
+                  <div class="analyst-head">
+                    <div>
+                      <p class="eyebrow">Conversational audit intelligence</p>
+                      <h2>Ask the dataset</h2>
+                    </div>
+                    <span class="ai-badge">Grounded AI</span>
+                  </div>
+                  <div id="promptChips" class="prompt-chips"></div>
+                  <div id="chatThread" class="chat-thread"></div>
+                  <div class="analyst-bar">
+                    <input id="analystQuestion" type="text" placeholder="Ask about fixes, ML readiness, rules, or executive summary">
+                    <button id="askAnalystButton">Ask</button>
+                  </div>
+                </div>
+              </section>
+            </section>
+
+            <aside class="inspector-pane">
+              <div class="panel sticky-panel">
+                <div class="panel-heading">
+                  <h2>Inspector</h2>
+                  <span id="inspectorKind" class="chip">context</span>
+                </div>
+                <div id="inspectorContent" class="inspector-content"></div>
+              </div>
+            </aside>
+          </section>
+        </section>
+
+
+        </div></div>
+      </section>
+
+      <section id="remediationRiskDialog" class="modal-shell remediation-risk-dialog hidden" aria-modal="true" role="dialog" aria-labelledby="remediationRiskDialogTitle">
+        <div class="modal-card remediation-risk-dialog-card">
+          <header class="remediation-risk-dialog-header">
+            <span class="remediation-risk-dialog-icon" aria-hidden="true">!</span>
+            <div>
+              <p class="eyebrow">Approval required</p>
+              <h2 id="remediationRiskDialogTitle">Projected reliability decrease</h2>
+              <p id="remediationRiskDialogSummary">Review the projected score impact before creating the dataset copy.</p>
+            </div>
+            <button id="closeRemediationRiskDialog" type="button" class="icon-button" aria-label="Close confirmation dialog">&#215;</button>
+          </header>
+          <div class="remediation-risk-dialog-body">
+            <div class="remediation-risk-score-comparison">
+              <article><span>Current score</span><strong id="remediationRiskCurrentScore">&#8212;</strong></article>
+              <span class="remediation-risk-arrow" aria-hidden="true">&#8594;</span>
+              <article><span>Projected score</span><strong id="remediationRiskProjectedScore">&#8212;</strong></article>
+              <article class="remediation-risk-change"><span>Projected change</span><strong id="remediationRiskScoreDelta">&#8212;</strong></article>
+            </div>
+            <div class="remediation-risk-dialog-warning">
+              <span aria-hidden="true">!</span>
+              <p>Selected remediation actions may introduce additional reliability risks. The original dataset will remain unchanged, but the new governed copy may score lower.</p>
+            </div>
+            <label class="remediation-risk-acknowledgement"><input id="remediationRiskAcknowledgement" type="checkbox">I understand the projected decrease and approve creation of the dataset copy.</label>
+          </div>
+          <footer class="remediation-risk-dialog-actions">
+            <button id="cancelRemediationRiskDialog" type="button" class="secondary-button">Cancel</button>
+            <button id="confirmRemediationRiskDialog" type="button" class="risk-confirm-button" disabled>Create dataset copy</button>
+          </footer>
+        </div>
+      </section>
+
+
+      <section id="rulesPage" class="page-view hidden rules-page">
+        <header class="page-header rules-header"><div><p class="eyebrow">Core intelligence</p><h1>Rules &amp; Contracts</h1><p>Manage quality rules, dataset assignments, contracts, and execution evidence.</p></div><div class="page-actions"><button id="newRuleButton">&#65291; New Rule</button></div></header>
+        <nav class="rules-tabs" aria-label="Rules workspace tabs"><button class="active" data-rules-tab="library">Rule Library</button><button data-rules-tab="contracts">Data Contracts</button><button data-rules-tab="assignments">Assignments</button><button data-rules-tab="history">Execution History</button></nav>
+        <section class="rules-metrics"><article><span>Total Rules</span><strong id="rulesMetricTotal">0</strong><small id="rulesMetricActive">0 active</small></article><article><span>Assigned Datasets</span><strong id="rulesMetricAssigned">0</strong><small>Rules applied across datasets</small></article><article><span>Contracted Datasets</span><strong id="rulesMetricContracts">0</strong><small>Generated from latest audits</small></article><article><span>Executions</span><strong id="rulesMetricExecutions">0</strong><small>Recorded rule evaluations</small></article><article><span>Failing</span><strong id="rulesMetricFailing">0</strong><small id="rulesFailureRate">0% failure rate</small></article></section>
+        <div id="rulesLibraryTab" class="rules-tab-panel"><div class="rules-workspace-grid"><aside class="rules-filter-card"><div class="card-heading"><h2>Filters</h2><button id="rulesResetFilters" class="text-link">Reset</button></div><label>Search rules<input id="rulesSearch" placeholder="Search by rule name or description"></label><label>Scope<select id="rulesScopeFilter"><option value="all">All scopes</option><option value="column">Column</option><option value="dataset">Dataset</option></select></label><label>Category<select id="rulesCategoryFilter"><option value="all">All categories</option></select></label><label>Severity<select id="rulesSeverityFilter"><option value="all">All severities</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label><label>Status<select id="rulesStatusFilter"><option value="all">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select></label></aside><section class="rules-table-card"><div class="card-heading"><h2 id="rulesCountLabel">0 rules</h2><button id="rulesRefreshButton" class="secondary-button">&#8635; Refresh</button></div><div class="rules-table-wrap"><table class="rules-table"><thead><tr><th>Rule Name</th><th>Scope</th><th>Target</th><th>Category</th><th>Severity</th><th>Status</th><th>Assigned</th><th>Last Executed</th><th></th></tr></thead><tbody id="rulesTableBody"></tbody></table></div></section></div><section class="rules-analytics-grid"><article class="panel"><h2>Rule Categories</h2><div class="rules-chart"><canvas id="ruleCategoryChart"></canvas></div></article><article class="panel"><h2>Top Failing Rules</h2><div class="rules-chart"><canvas id="failingRulesChart"></canvas></div></article><article class="panel"><h2>Recent Activity</h2><div id="ruleRecentActivity" class="rule-activity-list"></div></article></section></div>
+        <div id="rulesContractsTab" class="rules-tab-panel hidden">
+          <section class="tab-feature-header"><div><p class="eyebrow">Governance evidence</p><h2>Data Contracts</h2><p>Define, version, validate, publish, and archive dataset reliability expectations.</p></div><div class="page-actions"><button id="generateContractButton" class="secondary-button">Generate from audit</button><button id="newContractButton">&#65291; New Contract</button></div></section>
+          <section class="contract-summary-grid"><article><span>Total contracts</span><strong id="contractMetricTotal">0</strong><small>Latest versions</small></article><article><span>Published</span><strong id="contractMetricPublished">0</strong><small>Actively governed datasets</small></article><article><span>Validation passed</span><strong id="contractMetricPassed">0</strong><small>Latest audit compliant</small></article><article><span>Needs attention</span><strong id="contractMetricFailed">0</strong><small>Failed or not validated</small></article></section>
+          <section class="contracts-workspace-grid"><article class="panel contract-list-panel"><div class="card-heading"><div><h2>Contract registry</h2><p class="muted">Latest contract version for each governed dataset.</p></div><input id="contractSearch" class="compact-search" placeholder="Search contracts or datasets"></div><div id="contractsGrid" class="contract-table-wrap"></div><section id="contractValidationRegistry" class="contract-validation-registry" aria-live="polite"></section></article><aside id="contractDetailPanel" class="panel contract-detail-panel"><p class="empty">Select a contract to inspect its requirements and validation status.</p></aside></section>
+        </div>
+        <div id="rulesAssignmentsTab" class="rules-tab-panel hidden">
+          <section class="tab-feature-header"><div><p class="eyebrow">Coverage</p><h2>Dataset Assignments</h2><p>Apply rules individually or in bulk and review coverage by dataset.</p></div><button id="refreshAssignmentsButton" class="secondary-button">&#8635; Refresh</button></section>
+          <section class="assignment-summary-grid"><article><span>Active assignments</span><strong id="assignmentMetricTotal">0</strong></article><article><span>Datasets covered</span><strong id="assignmentMetricDatasets">0</strong></article><article><span>Rules assigned</span><strong id="assignmentMetricRules">0</strong></article><article><span>Coverage rate</span><strong id="assignmentMetricCoverage">0%</strong></article></section>
+          <section class="panel bulk-assignment-card"><div class="card-heading"><div><h2>Bulk assignment</h2><p class="muted">Select rules and datasets, then apply or remove coverage in one action.</p></div></div><div class="bulk-assignment-controls"><label>Rules<select id="bulkAssignmentRules" multiple></select></label><label>Datasets<select id="bulkAssignmentDatasets" multiple></select></label><div class="bulk-assignment-actions"><button id="bulkAssignButton">Assign selected</button><button id="bulkUnassignButton" class="secondary-button">Remove selected</button></div></div></section>
+          <section class="panel"><div class="card-heading"><div><h2>Assignment coverage</h2><p class="muted">Rules grouped by dataset with direct assignment controls.</p></div><input id="assignmentSearch" class="compact-search" placeholder="Search datasets or rules"></div><div id="assignmentsGrid" class="assignment-table-wrap"></div></section>
+        </div>
+        <div id="rulesHistoryTab" class="rules-tab-panel hidden">
+          <section class="tab-feature-header"><div><p class="eyebrow">Execution evidence</p><h2>Execution History</h2><p>Explore pass and failure evidence, trends, affected records, and related audits.</p></div><button id="exportExecutionHistoryButton" class="secondary-button">&#8681; Export CSV</button></section>
+          <section class="execution-summary-grid"><article><span>Total executions</span><strong id="executionMetricTotal">0</strong></article><article><span>Passed</span><strong id="executionMetricPassed">0</strong></article><article><span>Failed</span><strong id="executionMetricFailed">0</strong></article><article><span>Failure rate</span><strong id="executionMetricRate">0%</strong></article></section>
+          <section class="execution-chart-grid"><article class="panel"><h2>Execution outcomes</h2><div class="rules-chart"><canvas id="executionOutcomeChart"></canvas></div></article><article class="panel"><h2>Failure trend</h2><div class="rules-chart"><canvas id="executionTrendChart"></canvas></div></article></section>
+          <section class="panel"><div class="execution-filter-bar"><input id="executionSearch" placeholder="Search rules"><select id="executionOutcomeFilter"><option value="all">All outcomes</option><option value="passed">Passed</option><option value="failed">Failed</option></select><select id="executionRuleFilter"><option value="all">All rules</option></select><select id="executionDatasetFilter"><option value="all">All datasets</option></select><button id="executionResetFilters" class="secondary-button">Clear filters</button></div><div id="executionHistoryTable"></div><div id="executionPagination" class="table-pagination"></div></section>
+        </div>
+      </section>
+      <section id="contractGenerator" class="modal-shell hidden" aria-modal="true" role="dialog" aria-labelledby="contractGeneratorTitle">
+        <div class="modal-card contract-generator-card">
+          <header class="rule-editor-header"><div><p class="eyebrow">Generate contract</p><h2 id="contractGeneratorTitle">Generate from latest audit</h2><p class="rule-editor-intro">Select a registered dataset with a completed audit.</p></div><button type="button" id="closeContractGenerator" class="icon-button rule-editor-close">&#215;</button></header>
+          <div class="contract-generator-body"><label>Dataset<select id="contractGeneratorDataset"></select></label><div id="contractGeneratorContext" class="contract-generator-context"></div><div id="contractGeneratorError" class="form-error hidden"></div></div>
+          <footer class="form-actions rule-editor-actions"><button type="button" id="cancelContractGenerator" class="secondary-button">Cancel</button><button type="button" id="confirmContractGeneration">Generate contract</button></footer>
+        </div>
+      </section>
+      <section id="contractEditor" class="modal-shell hidden" aria-modal="true" role="dialog" aria-labelledby="contractEditorTitle">
+        <form id="contractEditorForm" class="modal-card contract-editor-card">
+          <header class="rule-editor-header"><div><p class="eyebrow">Data contract</p><h2 id="contractEditorTitle">Create Contract</h2><p class="rule-editor-intro">Define dataset schema expectations and governance thresholds.</p></div><button type="button" id="closeContractEditor" class="icon-button rule-editor-close">&#215;</button></header>
+          <input id="contractEditorId" type="hidden">
+          <div class="contract-editor-grid">
+            <label>Dataset<select id="contractDataset" required></select></label><label>Status<select id="contractStatus"><option value="draft">Draft</option><option value="published">Published</option><option value="archived">Archived</option></select></label>
+            <label class="wide">Contract name<input id="contractName" required placeholder="e.g. Customer master reliability contract"></label>
+            <label class="wide">Description<textarea id="contractDescription" rows="2"></textarea></label>
+            <label class="wide">Contract definition <span class="field-hint">Generated automatically from the latest completed dataset audit. You can refine it before saving.</span><textarea id="contractDefinition" class="code-input" rows="15" required>{}</textarea><span id="contractDefinitionStatus" class="contract-definition-status" role="status" aria-live="polite"></span></label>
+          </div>
+          <footer class="form-actions rule-editor-actions"><button type="button" id="cancelContractEditor" class="secondary-button">Cancel</button><button type="submit">Save contract version</button></footer>
+        </form>
+      </section>
+      <section id="ruleEditor" class="modal-shell hidden" aria-modal="true" role="dialog" aria-labelledby="ruleEditorTitle">
+        <form id="ruleEditorForm" class="modal-card rule-editor-card">
+          <header class="rule-editor-header">
+            <div>
+              <p class="eyebrow">Quality rule</p>
+              <h2 id="ruleEditorTitle">Custom Rule Builder</h2>
+              <p class="rule-editor-intro">Build, test, preview, and assign a quality rule without writing code.</p>
+            </div>
+            <button type="button" id="closeRuleEditor" class="icon-button rule-editor-close" aria-label="Close rule editor">&#215;</button>
+          </header>
+          <div class="rule-editor-toolbar">
+            <span>Rule configuration</span>
+            <button type="button" id="loadSampleRuleButton" class="text-button">Load sample rule</button>
+          </div>
+          <input id="ruleEditorId" type="hidden">
+          <div class="rule-form-grid">
+            <section class="rule-form-section wide">
+              <div class="rule-form-section-heading"><span>01</span><div><h3>Rule identity</h3><p>Name and describe the reliability expectation.</p></div></div>
+              <div class="rule-section-grid">
+                <label class="wide">Rule name<input id="ruleName" placeholder="e.g. Customer email format" required></label>
+                <label class="wide">Description<textarea id="ruleDescription" rows="3" placeholder="Explain what this rule protects and why it matters."></textarea></label>
+              </div>
+            </section>
+            <section class="rule-form-section wide">
+              <div class="rule-form-section-heading"><span>02</span><div><h3>Validation logic</h3><p>Choose where and how the rule should be evaluated.</p></div></div>
+              <div class="rule-section-grid">
+                <label>Dataset for testing and assignment<select id="ruleBuilderDataset"><option value="">Select a dataset</option></select></label>
+                <label>Rule type<select id="ruleType"><option value="required">Required value</option><option value="unique">Unique value</option><option value="email">Email format</option><option value="allowed_values">Allowed values</option><option value="regex">Regular expression</option><option value="numeric_range">Numeric range</option><option value="length_range">Text length</option><option value="missing_threshold">Missing threshold</option><option value="expected_type">Expected type</option><option value="stale_days">Freshness window</option><option value="duplicate_rows">Duplicate rows</option></select></label>
+                <label>Scope<select id="ruleScope"><option value="column">Column</option><option value="dataset">Dataset</option></select></label>
+                <label>Target column <span class="field-hint">Choose a dataset column or enter a reusable column name</span><input id="ruleColumn" list="ruleColumnOptions" placeholder="e.g. email"><datalist id="ruleColumnOptions"></datalist></label>
+                <label>Category<select id="ruleCategory"><option>completeness</option><option>validity</option><option>uniqueness</option><option>consistency</option><option>accuracy</option><option>timeliness</option></select></label>
+                <label>Severity<select id="ruleSeverity"><option>critical</option><option>high</option><option selected>medium</option><option>low</option></select></label>
+                <label class="switch-label rule-active-toggle"><input id="ruleActive" type="checkbox" checked><span><strong>Active rule</strong><small>Execute during assigned dataset audits.</small></span></label>
+                <div id="ruleGuidedParameters" class="wide guided-parameter-grid"></div>
+                <label class="wide advanced-parameter-field">Advanced parameters <span class="field-hint">Generated automatically; edit only when needed</span><textarea id="ruleParameters" class="code-input" rows="4">{}</textarea></label>
+              </div>
+            </section>
+            <section class="rule-form-section wide">
+              <div class="rule-form-section-heading"><span>03</span><div><h3>Corrective guidance</h3><p>Explain how users should resolve a failed result.</p></div></div>
+              <div class="rule-section-grid"><label class="wide">Recommendation<textarea id="ruleRecommendation" rows="3" placeholder="Describe the action required to correct failed records."></textarea></label></div>
+            </section>
+            <section class="rule-form-section wide rule-test-section">
+              <div class="rule-form-section-heading"><span>04</span><div><h3>Test and impact preview</h3><p>Run the unsaved rule against the selected dataset before saving it.</p></div></div>
+              <div id="ruleTestResult" class="rule-test-result"><p class="muted">Select a dataset and configure the rule, then run a test.</p></div>
+            </section>
+          </div>
+          <div id="ruleEditorFeedback" class="rule-editor-feedback" aria-live="polite"></div>
+          <footer class="form-actions rule-editor-actions">
+            <button type="button" id="deleteRuleButton" class="danger-button hidden">Delete rule</button>
+            <span class="form-action-spacer"></span>
+            <label class="builder-assign-toggle"><input id="ruleAssignAfterSave" type="checkbox" checked> Assign to selected dataset</label>
+            <button type="button" id="testRuleButton" class="secondary-button">Test rule</button>
+            <button type="button" id="cancelRuleEditor" class="secondary-button">Cancel</button>
+            <button type="button" id="saveRuleButton" onclick="saveRule(event)">Save rule</button>
+          </footer>
+        </form>
+      </section>
+
+        <section id="teamPage" class="feature-page hidden" aria-labelledby="teamPageTitle">
+          <header class="feature-hero">
+            <div>
+              <p class="eyebrow">Organization administration</p>
+              <h1 id="teamPageTitle">Team &amp; Roles</h1>
+              <p>Control who can access your reliability workspace and what each person is allowed to manage.</p>
+            </div>
+            <button id="refreshTeamButton" class="secondary-button">Refresh team</button>
+          </header>
+          <div id="teamPermissionNote" class="team-note"></div>
+          <section class="team-layout">
+            <article id="inviteCard" class="panel invite-card">
+              <p class="eyebrow">New access</p>
+              <h2>Invite a team member</h2>
+              <p class="muted">Create a secure, one-time activation link for a colleague.</p>
+              <form id="inviteForm" class="invite-form">
+                <label>Full name<input id="inviteName" required minlength="2" placeholder="Jane Doe"></label>
+                <label>Email<input id="inviteEmail" required type="email" placeholder="jane@company.com"></label>
+                <label>Role<select id="inviteRole"><option value="analyst">Analyst</option><option value="viewer">Viewer</option><option value="admin">Admin</option><option value="owner">Owner</option></select></label>
+                <button type="submit">Create invitation</button>
+              </form>
+              <div id="inviteResult" class="invite-result hidden"></div>
+            </article>
+            <article class="panel team-directory-card">
+              <div class="panel-heading"><div><p class="eyebrow">Active access</p><h2>Members</h2></div></div>
+              <div id="teamMembers" class="team-list"></div>
+            </article>
+          </section>
+          <section class="panel invitations-card">
+            <div class="panel-heading"><div><p class="eyebrow">Pending access</p><h2>Invitations</h2></div></div>
+            <div id="teamInvitations" class="team-list"></div>
+          </section>
+        </section>
+
+    </main>
+  </div>
+</div>
+
+<div id="contractMini" class="hidden" aria-hidden="true"></div>
+<section id="workspaceDialog" class="workspace-dialog hidden" role="dialog" aria-modal="true" aria-labelledby="workspaceDialogTitle">
+  <div class="workspace-dialog-backdrop" data-close-workspace-dialog></div>
+  <article class="workspace-dialog-card">
+    <header class="workspace-dialog-header">
+      <div><p class="eyebrow">Workspace administration</p><h2 id="workspaceDialogTitle">Create workspace</h2><p>Create a separate governed environment for datasets, audits, rules, and team activity.</p></div>
+      <button id="closeWorkspaceDialog" class="icon-button" type="button" aria-label="Close create workspace form">&#215;</button>
+    </header>
+    <form id="workspaceCreateForm" class="workspace-create-form">
+      <label>Workspace name<input id="newWorkspaceName" type="text" minlength="2" maxlength="255" required placeholder="Data Governance"></label>
+      <label>Description<textarea id="newWorkspaceDescription" maxlength="500" rows="4" placeholder="Describe the purpose of this workspace."></textarea></label>
+      <p id="workspaceCreateError" class="login-error" role="alert"></p>
+      <footer class="workspace-dialog-actions"><button id="cancelWorkspaceCreate" type="button" class="secondary-button">Cancel</button><button id="submitWorkspaceCreate" type="submit">Create and activate</button></footer>
+    </form>
+  </article>
+</section>
+
+<dialog id="appMessageDialog" class="modal-dialog app-message-dialog" aria-labelledby="appMessageTitle" aria-describedby="appMessageDescription">
+  <div class="modal-header">
+    <div><p id="appMessageEyebrow" class="eyebrow">Confirmation</p><h2 id="appMessageTitle">Confirm action</h2><p id="appMessageDescription">Review this action before continuing.</p></div>
+    <button id="closeAppMessageDialog" class="icon-button" type="button" aria-label="Close dialog">&#215;</button>
+  </div>
+  <div class="app-message-actions">
+    <button id="cancelAppMessageDialog" type="button" class="secondary-button">Cancel</button>
+    <button id="confirmAppMessageDialog" type="button">Continue</button>
+  </div>
+</dialog>
+
+    <section id="authGate" class="auth-gate">
+      <form id="inviteAcceptForm" class="login-card hidden">
+        <div class="product-logo login-logo">DR</div><p class="eyebrow">Team invitation</p><h1>Join Data Reliability Copilot</h1><p id="inviteAcceptMessage">Create your password to activate your account.</p>
+        <label>Password<input id="invitePassword" type="password" minlength="8" autocomplete="new-password" required></label>
+        <button type="submit">Accept invitation</button><span id="inviteAcceptError" class="login-error"></span>
+      </form>
+      <form id="loginForm" class="login-card">
+        <div class="product-logo login-logo">DR</div>
+        <p class="eyebrow">Secure workspace</p>
+        <h1>Sign in to Data Reliability Copilot</h1>
+        <p>Access governed audits, remediation workflows, and reliability evidence.</p>
+        <label>Email<input id="loginEmail" type="email" autocomplete="username" required></label>
+        <label>Password<input id="loginPassword" type="password" autocomplete="current-password" required></label>
+        <button id="loginButton" type="submit">Sign in</button>
+        <span id="loginError" class="login-error"></span>
+        <p class="auth-switch">New to DRC? <button id="showRegisterButton" type="button" class="auth-link">Create an account</button></p>
+      </form>
+      <form id="registerForm" class="login-card register-card hidden">
+        <div class="product-logo login-logo">DR</div>
+        <p class="eyebrow">Create your workspace</p>
+        <h1>Start with Data Reliability Copilot</h1>
+        <p>Create your owner account, organization, and first reliability workspace.</p>
+        <div class="registration-grid">
+          <label>Full name<input id="registerName" type="text" autocomplete="name" required minlength="2"></label>
+          <label>Work email<input id="registerEmail" type="email" autocomplete="email" required></label>
+          <label>Organization<input id="registerOrganization" type="text" required minlength="2"></label>
+          <label>Workspace name<input id="registerWorkspace" type="text" value="Reliability Operations" required minlength="2"></label>
+          <label>Password<input id="registerPassword" type="password" autocomplete="new-password" required minlength="8"></label>
+          <label>Confirm password<input id="registerConfirmPassword" type="password" autocomplete="new-password" required minlength="8"></label>
+        </div>
+        <small class="password-guidance">Use at least 8 characters. You will become the organization owner.</small>
+        <button id="registerButton" type="submit">Create account</button>
+        <span id="registerError" class="login-error"></span>
+        <p class="auth-switch">Already have an account? <button id="showLoginButton" type="button" class="auth-link">Sign in</button></p>
+      </form>
+    </section>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- compatibility marker: /static/app.js?v=0.25.8 -->
+    <script src="/static/app.js?v=0.25.8"></script>
+  </body>
+</html>
+

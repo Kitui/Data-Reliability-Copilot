@@ -1,0 +1,85 @@
+from __future__ import annotations
+
+from contextlib import asynccontextmanager, suppress
+import asyncio
+
+from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+
+from app.api.routes import alerts, audits, auth, connectors, copilot, datasets, quality_rules, reports, schema_drift, schedules, system, team, workspaces
+from app.core.config import get_settings
+from app.core.errors import unhandled_exception_handler
+from app.db.migrations import run_migrations
+from app.auth import ensure_bootstrap_admin
+from app.tenancy import ensure_bootstrap_tenant
+
+
+async def _scheduled_audit_worker() -> None:
+    # Polling keeps local and single-process deployments functional without
+    # requiring an external scheduler. Due schedules are claimed before run.
+    while True:
+        try:
+            await asyncio.to_thread(schedules.process_all_due)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            # A failed poll must not stop the application or future schedules.
+            pass
+        await asyncio.sleep(10)
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    settings = get_settings()
+    if settings.run_migrations:
+        run_migrations()
+    ensure_bootstrap_admin()
+    ensure_bootstrap_tenant()
+    scheduler_task = asyncio.create_task(_scheduled_audit_worker()) if settings.enable_internal_scheduler else None
+    try:
+        yield
+    finally:
+        if scheduler_task is not None:
+            scheduler_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await scheduler_task
+
+
+def create_app() -> FastAPI:
+    settings = get_settings()
+    application = FastAPI(
+        title=settings.app_name,
+        version=settings.app_version,
+        description="Audit, explain, govern, and improve data reliability.",
+        lifespan=lifespan,
+    )
+    application.mount("/static", StaticFiles(directory=settings.static_dir), name="static")
+    application.include_router(system.router)
+    application.include_router(auth.router)
+    application.include_router(workspaces.router)
+    application.include_router(team.router)
+    application.include_router(datasets.router)
+    application.include_router(schema_drift.router)
+    application.include_router(schedules.router)
+    application.include_router(alerts.router)
+    application.include_router(connectors.router)
+    application.include_router(copilot.router)
+    application.include_router(reports.router)
+    application.include_router(quality_rules.router)
+    application.include_router(audits.router)
+    application.add_exception_handler(Exception, unhandled_exception_handler)
+
+    @application.get("/", response_class=HTMLResponse, include_in_schema=False)
+    def dashboard() -> str:
+        return (settings.static_dir / "index.html").read_text(encoding="utf-8")
+
+    return application
+
+
+app = create_app()
+
+# Compatibility exports retained for existing integrations and tests.
+load_audit = audits.load_audit
+parse_rule_config = audits.parse_rule_config
+save_upload = audits.save_upload
