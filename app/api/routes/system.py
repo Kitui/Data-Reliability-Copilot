@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Response
 from sqlalchemy import select
@@ -10,7 +10,12 @@ from app.core.config import get_settings
 from app.core.observability import metrics
 from app.db.models import OperationalAlertRecord
 from app.db.session import session_scope
-from app.services.operational_reliability import database_check, evaluate_operational_alerts, queue_summary, readiness_report
+from app.services.operational_reliability import (
+    database_check,
+    evaluate_operational_alerts,
+    queue_summary,
+    readiness_report,
+)
 
 router = APIRouter(tags=["System"])
 
@@ -24,7 +29,7 @@ def liveness() -> dict[str, str]:
         "service": settings.service_name,
         "version": settings.app_version,
         "environment": settings.environment,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
 
 
@@ -60,7 +65,9 @@ def operations_summary(user: dict = Depends(require_roles("owner", "admin"))) ->
             "requests": snapshot.request_total,
             "errors": snapshot.error_total,
             "active": snapshot.active_requests,
-            "average_latency_ms": round(snapshot.latency_sum_ms / snapshot.request_total, 2) if snapshot.request_total else 0,
+            "average_latency_ms": round(snapshot.latency_sum_ms / snapshot.request_total, 2)
+            if snapshot.request_total
+            else 0,
             "status_counts": snapshot.status_counts,
         },
     }
@@ -75,13 +82,18 @@ def evaluate_alerts(user: dict = Depends(require_roles("owner", "admin"))) -> di
 @router.get("/operations/alerts")
 def list_operational_alerts(user: dict = Depends(require_roles("owner", "admin"))) -> list[dict]:
     with session_scope() as db:
-        rows = db.scalars(select(OperationalAlertRecord).order_by(OperationalAlertRecord.created_at.desc()).limit(100)).all()
-        return [{
-            "id": row.id,
-            "alert_type": row.alert_type,
-            "severity": row.severity,
-            "status": row.status,
-            "message": row.message,
-            "created_at": row.created_at,
-            "resolved_at": row.resolved_at,
-        } for row in rows]
+        rows = db.scalars(
+            select(OperationalAlertRecord).order_by(OperationalAlertRecord.created_at.desc()).limit(100)
+        ).all()
+        return [
+            {
+                "id": row.id,
+                "alert_type": row.alert_type,
+                "severity": row.severity,
+                "status": row.status,
+                "message": row.message,
+                "created_at": row.created_at,
+                "resolved_at": row.resolved_at,
+            }
+            for row in rows
+        ]

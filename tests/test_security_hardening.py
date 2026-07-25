@@ -10,7 +10,10 @@ from app.main import create_app
 
 
 def _login(client: TestClient):
-    return client.post("/auth/login", json={"email": get_settings().bootstrap_admin_email, "password": get_settings().bootstrap_admin_password})
+    return client.post(
+        "/auth/login",
+        json={"email": get_settings().bootstrap_admin_email, "password": get_settings().bootstrap_admin_password},
+    )
 
 
 def test_security_headers_and_request_id_are_present():
@@ -24,13 +27,16 @@ def test_security_headers_and_request_id_are_present():
 
 def test_registration_enforces_strong_password_policy():
     with TestClient(create_app()) as client:
-        response = client.post("/auth/register", json={
-            "full_name": "Weak Password",
-            "email": "weak@example.com",
-            "password": "password1234",
-            "organization_name": "Weak Org",
-            "workspace_name": "Workspace",
-        })
+        response = client.post(
+            "/auth/register",
+            json={
+                "full_name": "Weak Password",
+                "email": "weak@example.com",
+                "password": "password1234",
+                "organization_name": "Weak Org",
+                "workspace_name": "Workspace",
+            },
+        )
         assert response.status_code == 400
 
 
@@ -78,4 +84,7 @@ def test_administrative_audit_log_is_workspace_scoped():
         assert response.status_code == 200
         assert any(item["action"] == "auth.login" for item in response.json())
     with session_scope() as db:
-        assert db.scalar(select(AdministrativeAuditLogRecord).where(AdministrativeAuditLogRecord.action == "auth.login")) is not None
+        assert (
+            db.scalar(select(AdministrativeAuditLogRecord).where(AdministrativeAuditLogRecord.action == "auth.login"))
+            is not None
+        )

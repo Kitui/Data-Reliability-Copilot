@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest
 
+from app.api.dependencies import get_audit_store
 from app.core.config import get_settings
 from app.db.session import get_engine, get_session_factory
-from app.api.dependencies import get_audit_store
 
 
 @pytest.fixture(autouse=True)

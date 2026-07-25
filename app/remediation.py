@@ -53,7 +53,10 @@ def _action_for_issue(issue: QualityIssue) -> RemediationAction:
             title="Protect sensitive fields",
             action_type="mask",
             description="Pseudonymize sensitive values while preserving valid formats and stable uniqueness wherever possible.",
-            pandas_code="\n".join(f"{frame_ref}[{column!r}] = {frame_ref}[{column!r}].map(format_preserving_token)" for column in issue.columns),
+            pandas_code="\n".join(
+                f"{frame_ref}[{column!r}] = {frame_ref}[{column!r}].map(format_preserving_token)"
+                for column in issue.columns
+            ),
             sql_hint="Use hashing, tokenization, or column-level access controls for PII fields.",
             risk="high",
         )
@@ -92,7 +95,6 @@ def _build_script(dataset_name: str, actions: list[RemediationAction]) -> str:
     return "\n".join(lines)
 
 
-
 def _stable_token(value: object, length: int = 12) -> str:
     return hashlib.sha256(str(value).encode("utf-8")).hexdigest()[:length]
 
@@ -119,14 +121,19 @@ def _protect_sensitive_value(column: str, value: object) -> object:
     if any(part in lowered for part in ("date_of_birth", "dob")):
         return "1970-01-01"
     if any(part in lowered for part in ("ip_address", "ip")):
-        octets = [str((int(token[i:i+2], 16) % 254) + 1) for i in range(0, 8, 2)]
+        octets = [str((int(token[i : i + 2], 16) % 254) + 1) for i in range(0, 8, 2)]
         return ".".join(octets)
-    if any(part in lowered for part in ("card", "account", "passport", "national_id", "ssn", "identifier", "customer_id")):
+    if any(
+        part in lowered for part in ("card", "account", "passport", "national_id", "ssn", "identifier", "customer_id")
+    ):
         prefix = re.sub(r"[^A-Za-z]", "", raw)[:2].upper() or "ID"
         return f"{prefix}-{token[:12].upper()}"
     return f"TOKEN-{token.upper()}"
 
-def apply_remediation_actions(frame, audit: AuditResult, issue_ids: list[str], fill_strategy: str = "mode", mask_sensitive: bool = True):
+
+def apply_remediation_actions(
+    frame, audit: AuditResult, issue_ids: list[str], fill_strategy: str = "mode", mask_sensitive: bool = True
+):
     """Apply conservative, deterministic corrections to a copy of a dataframe."""
     import pandas as pd
 
@@ -143,8 +150,14 @@ def apply_remediation_actions(frame, audit: AuditResult, issue_ids: list[str], f
         changed_cells += 1
         changed_columns.add(column)
         if len(samples) < 20:
-            samples.append({"row": int(row) if isinstance(row, int) else str(row), "column": column,
-                            "before": None if pd.isna(before) else str(before), "after": None if pd.isna(after) else str(after)})
+            samples.append(
+                {
+                    "row": int(row) if isinstance(row, int) else str(row),
+                    "column": column,
+                    "before": None if pd.isna(before) else str(before),
+                    "after": None if pd.isna(after) else str(after),
+                }
+            )
 
     for issue in selected.values():
         columns = [c for c in issue.columns if c in result.columns]
@@ -188,7 +201,7 @@ def apply_remediation_actions(frame, audit: AuditResult, issue_ids: list[str], f
         elif issue.category == "privacy" and mask_sensitive:
             for column in columns:
                 before_series = result[column].copy()
-                after_series = before_series.map(lambda value: _protect_sensitive_value(column, value))
+                after_series = before_series.map(lambda value, column=column: _protect_sensitive_value(column, value))
                 changed = before_series.fillna("<NA>").astype(str) != after_series.fillna("<NA>").astype(str)
                 for idx in result.index[changed][:20]:
                     record_change(idx, column, before_series.at[idx], after_series.at[idx])
@@ -197,7 +210,9 @@ def apply_remediation_actions(frame, audit: AuditResult, issue_ids: list[str], f
                     changed_cells += extra
                     changed_columns.add(column)
                 result[column] = after_series
-            warnings.append(f"{issue.title}: applied format-preserving pseudonymization; score impact is determined by the projected audit, not a fixed privacy penalty.")
+            warnings.append(
+                f"{issue.title}: applied format-preserving pseudonymization; score impact is determined by the projected audit, not a fixed privacy penalty."
+            )
         else:
             warnings.append(f"{issue.title}: review-only action was not applied automatically.")
 

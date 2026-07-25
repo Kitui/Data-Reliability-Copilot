@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from sqlalchemy import func, select, text
@@ -13,7 +13,7 @@ from app.services.object_storage import GCSObjectStorage, LocalObjectStorage, bu
 
 
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def database_check() -> tuple[bool, str]:
@@ -76,21 +76,43 @@ def evaluate_operational_alerts() -> list[OperationalAlertRecord]:
     queue = queue_summary()
 
     conditions = [
-        ("http_error_rate", error_rate >= settings.ops_error_rate_threshold, "high", f"HTTP error rate is {error_rate:.2%}."),
-        ("http_latency", average_latency >= settings.ops_latency_threshold_ms, "medium", f"Average HTTP latency is {average_latency:.0f} ms."),
-        ("queue_depth", queue.get("queued", 0) >= settings.ops_queue_depth_threshold, "high", f"Queued job count is {queue.get('queued', 0)}."),
-        ("failed_jobs", queue.get("failed", 0) >= settings.ops_failed_job_threshold, "high", f"Failed job count is {queue.get('failed', 0)}."),
+        (
+            "http_error_rate",
+            error_rate >= settings.ops_error_rate_threshold,
+            "high",
+            f"HTTP error rate is {error_rate:.2%}.",
+        ),
+        (
+            "http_latency",
+            average_latency >= settings.ops_latency_threshold_ms,
+            "medium",
+            f"Average HTTP latency is {average_latency:.0f} ms.",
+        ),
+        (
+            "queue_depth",
+            queue.get("queued", 0) >= settings.ops_queue_depth_threshold,
+            "high",
+            f"Queued job count is {queue.get('queued', 0)}.",
+        ),
+        (
+            "failed_jobs",
+            queue.get("failed", 0) >= settings.ops_failed_job_threshold,
+            "high",
+            f"Failed job count is {queue.get('failed', 0)}.",
+        ),
     ]
 
     with session_scope() as db:
         for alert_type, active, severity, message in conditions:
             if not active:
                 continue
-            recent = db.scalar(select(OperationalAlertRecord).where(
-                OperationalAlertRecord.alert_type == alert_type,
-                OperationalAlertRecord.status == "open",
-                OperationalAlertRecord.created_at >= now - timedelta(minutes=settings.ops_alert_cooldown_minutes),
-            ))
+            recent = db.scalar(
+                select(OperationalAlertRecord).where(
+                    OperationalAlertRecord.alert_type == alert_type,
+                    OperationalAlertRecord.status == "open",
+                    OperationalAlertRecord.created_at >= now - timedelta(minutes=settings.ops_alert_cooldown_minutes),
+                )
+            )
             if recent:
                 continue
             row = OperationalAlertRecord(

@@ -22,32 +22,60 @@ class Settings(BaseModel):
     session_hours: int = Field(default_factory=lambda: int(os.getenv("DRC_SESSION_HOURS", "12")))
     secure_cookies: bool = Field(default_factory=lambda: os.getenv("DRC_SECURE_COOKIES", "false").lower() == "true")
     bootstrap_admin_email: str = Field(default_factory=lambda: os.getenv("DRC_ADMIN_EMAIL", "admin@example.invalid"))
-    bootstrap_admin_password: str = Field(default_factory=lambda: os.getenv("DRC_ADMIN_PASSWORD", "replace-with-a-strong-random-password"))
+    bootstrap_admin_password: str = Field(
+        default_factory=lambda: os.getenv("DRC_ADMIN_PASSWORD", "replace-with-a-strong-random-password")
+    )
     bootstrap_admin_name: str = Field(default_factory=lambda: os.getenv("DRC_ADMIN_NAME", "DRC Administrator"))
     storage_backend: str = Field(default_factory=lambda: os.getenv("DRC_STORAGE_BACKEND", "local").strip().lower())
     gcs_bucket: str | None = Field(default_factory=lambda: os.getenv("DRC_GCS_BUCKET") or None)
     run_migrations: bool = Field(default_factory=lambda: os.getenv("DRC_RUN_MIGRATIONS", "true").lower() == "true")
-    enable_internal_scheduler: bool = Field(default_factory=lambda: os.getenv("DRC_ENABLE_INTERNAL_SCHEDULER", "false").lower() == "true")
+    enable_internal_scheduler: bool = Field(
+        default_factory=lambda: os.getenv("DRC_ENABLE_INTERNAL_SCHEDULER", "false").lower() == "true"
+    )
     scheduler_token: str | None = Field(default_factory=lambda: os.getenv("DRC_SCHEDULER_TOKEN") or None)
     max_upload_bytes: int = Field(default_factory=lambda: int(os.getenv("DRC_MAX_UPLOAD_BYTES", str(25 * 1024 * 1024))))
-    allowed_hosts: list[str] = Field(default_factory=lambda: [x.strip() for x in os.getenv("DRC_ALLOWED_HOSTS", "localhost,127.0.0.1,testserver").split(",") if x.strip()])
-    cors_origins: list[str] = Field(default_factory=lambda: [x.strip() for x in os.getenv("DRC_CORS_ORIGINS", "").split(",") if x.strip()])
+    allowed_hosts: list[str] = Field(
+        default_factory=lambda: [
+            x.strip() for x in os.getenv("DRC_ALLOWED_HOSTS", "localhost,127.0.0.1,testserver").split(",") if x.strip()
+        ]
+    )
+    cors_origins: list[str] = Field(
+        default_factory=lambda: [x.strip() for x in os.getenv("DRC_CORS_ORIGINS", "").split(",") if x.strip()]
+    )
     csrf_cookie_name: str = Field(default_factory=lambda: os.getenv("DRC_CSRF_COOKIE", "drc_csrf"))
-    csrf_enabled: bool = Field(default_factory=lambda: os.getenv("DRC_CSRF_ENABLED", "false" if os.getenv("DRC_ENVIRONMENT", "development").strip().lower() == "testing" else "true").lower() == "true")
+    csrf_enabled: bool = Field(
+        default_factory=lambda: os.getenv(
+            "DRC_CSRF_ENABLED",
+            "false" if os.getenv("DRC_ENVIRONMENT", "development").strip().lower() == "testing" else "true",
+        ).lower()
+        == "true"
+    )
     login_window_minutes: int = Field(default_factory=lambda: int(os.getenv("DRC_LOGIN_WINDOW_MINUTES", "15")))
     login_max_attempts: int = Field(default_factory=lambda: int(os.getenv("DRC_LOGIN_MAX_ATTEMPTS", "5")))
     login_lockout_minutes: int = Field(default_factory=lambda: int(os.getenv("DRC_LOGIN_LOCKOUT_MINUTES", "15")))
     password_min_length: int = Field(default_factory=lambda: int(os.getenv("DRC_PASSWORD_MIN_LENGTH", "12")))
-    require_email_verification: bool = Field(default_factory=lambda: os.getenv("DRC_REQUIRE_EMAIL_VERIFICATION", "false").lower() == "true")
-    expose_dev_tokens: bool = Field(default_factory=lambda: os.getenv("DRC_EXPOSE_DEV_TOKENS", "false").lower() == "true")
+    require_email_verification: bool = Field(
+        default_factory=lambda: os.getenv("DRC_REQUIRE_EMAIL_VERIFICATION", "false").lower() == "true"
+    )
+    expose_dev_tokens: bool = Field(
+        default_factory=lambda: os.getenv("DRC_EXPOSE_DEV_TOKENS", "false").lower() == "true"
+    )
     log_level: str = Field(default_factory=lambda: os.getenv("DRC_LOG_LEVEL", "INFO").strip().upper())
     log_format: str = Field(default_factory=lambda: os.getenv("DRC_LOG_FORMAT", "json").strip().lower())
     metrics_token: str | None = Field(default_factory=lambda: os.getenv("DRC_METRICS_TOKEN") or None)
-    ops_error_rate_threshold: float = Field(default_factory=lambda: float(os.getenv("DRC_OPS_ERROR_RATE_THRESHOLD", "0.10")))
-    ops_latency_threshold_ms: float = Field(default_factory=lambda: float(os.getenv("DRC_OPS_LATENCY_THRESHOLD_MS", "2000")))
-    ops_queue_depth_threshold: int = Field(default_factory=lambda: int(os.getenv("DRC_OPS_QUEUE_DEPTH_THRESHOLD", "25")))
+    ops_error_rate_threshold: float = Field(
+        default_factory=lambda: float(os.getenv("DRC_OPS_ERROR_RATE_THRESHOLD", "0.10"))
+    )
+    ops_latency_threshold_ms: float = Field(
+        default_factory=lambda: float(os.getenv("DRC_OPS_LATENCY_THRESHOLD_MS", "2000"))
+    )
+    ops_queue_depth_threshold: int = Field(
+        default_factory=lambda: int(os.getenv("DRC_OPS_QUEUE_DEPTH_THRESHOLD", "25"))
+    )
     ops_failed_job_threshold: int = Field(default_factory=lambda: int(os.getenv("DRC_OPS_FAILED_JOB_THRESHOLD", "5")))
-    ops_alert_cooldown_minutes: int = Field(default_factory=lambda: int(os.getenv("DRC_OPS_ALERT_COOLDOWN_MINUTES", "30")))
+    ops_alert_cooldown_minutes: int = Field(
+        default_factory=lambda: int(os.getenv("DRC_OPS_ALERT_COOLDOWN_MINUTES", "30"))
+    )
     root_dir: Path = Path(__file__).resolve().parents[2]
 
     @property
@@ -105,7 +133,15 @@ class Settings(BaseModel):
             errors.append("DRC_LOG_FORMAT must be json or text.")
         if not 0 <= self.ops_error_rate_threshold <= 1:
             errors.append("DRC_OPS_ERROR_RATE_THRESHOLD must be between 0 and 1.")
-        if min(self.ops_latency_threshold_ms, self.ops_queue_depth_threshold, self.ops_failed_job_threshold, self.ops_alert_cooldown_minutes) < 1:
+        if (
+            min(
+                self.ops_latency_threshold_ms,
+                self.ops_queue_depth_threshold,
+                self.ops_failed_job_threshold,
+                self.ops_alert_cooldown_minutes,
+            )
+            < 1
+        ):
             errors.append("Operational reliability thresholds must be positive.")
         if self.password_min_length < 12:
             errors.append("DRC_PASSWORD_MIN_LENGTH must be at least 12.")
@@ -136,7 +172,10 @@ class Settings(BaseModel):
                 errors.append("Set DRC_SCHEDULER_TOKEN to a secret of at least 24 characters in production.")
             if self.bootstrap_admin_email in {"admin@drc.local", "admin@example.invalid"}:
                 errors.append("Set a unique DRC_ADMIN_EMAIL in production.")
-            if self.bootstrap_admin_password in {"ChangeMe123!", "replace-with-a-strong-random-password"} or len(self.bootstrap_admin_password) < 16:
+            if (
+                self.bootstrap_admin_password in {"ChangeMe123!", "replace-with-a-strong-random-password"}
+                or len(self.bootstrap_admin_password) < 16
+            ):
                 errors.append("Set a unique DRC_ADMIN_PASSWORD of at least 16 characters in production.")
         if errors:
             raise ConfigurationError("Invalid DRC configuration:\n- " + "\n- ".join(errors))

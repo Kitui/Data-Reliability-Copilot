@@ -8,13 +8,29 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api.routes import alerts, audits, auth, connectors, copilot, datasets, jobs, quality_rules, reports, schema_drift, schedules, security, system, team, workspaces
+from app.api.routes import (
+    alerts,
+    audits,
+    auth,
+    connectors,
+    copilot,
+    datasets,
+    jobs,
+    quality_rules,
+    reports,
+    schedules,
+    schema_drift,
+    security,
+    system,
+    team,
+    workspaces,
+)
+from app.auth import ensure_bootstrap_admin
 from app.core.config import get_settings
 from app.core.errors import unhandled_exception_handler
-from app.core.security_middleware import SecurityMiddleware
 from app.core.observability import ObservabilityMiddleware, configure_logging
+from app.core.security_middleware import SecurityMiddleware
 from app.db.migrations import run_migrations
-from app.auth import ensure_bootstrap_admin
 from app.tenancy import ensure_bootstrap_tenant
 
 

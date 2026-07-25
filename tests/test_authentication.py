@@ -3,10 +3,10 @@ from sqlalchemy import select
 
 from app.auth import ensure_bootstrap_admin
 from app.core.config import get_settings
+from app.db.migrations import run_migrations
 from app.db.models import UserRecord
 from app.db.session import session_scope
 from app.main import create_app
-from app.db.migrations import run_migrations
 
 
 def test_bootstrap_admin_is_created_with_hashed_password() -> None:
@@ -22,10 +22,13 @@ def test_bootstrap_admin_is_created_with_hashed_password() -> None:
 def test_login_session_and_logout_flow() -> None:
     with TestClient(create_app()) as client:
         assert client.get("/auth/me").status_code == 401
-        response = client.post("/auth/login", json={
-            "email": get_settings().bootstrap_admin_email,
-            "password": get_settings().bootstrap_admin_password,
-        })
+        response = client.post(
+            "/auth/login",
+            json={
+                "email": get_settings().bootstrap_admin_email,
+                "password": get_settings().bootstrap_admin_password,
+            },
+        )
         assert response.status_code == 200
         assert response.json()["user"]["role"] == "admin"
         assert client.get("/auth/me").status_code == 200
@@ -40,13 +43,16 @@ def test_audit_routes_require_authentication() -> None:
 
 def test_self_service_registration_creates_owner_tenant_and_session() -> None:
     with TestClient(create_app()) as client:
-        response = client.post("/auth/register", json={
-            "full_name": "Paul Test",
-            "email": "paul@example.com",
-            "password": "StrongPass123!",
-            "organization_name": "Opsyn Labs",
-            "workspace_name": "Data Reliability",
-        })
+        response = client.post(
+            "/auth/register",
+            json={
+                "full_name": "Paul Test",
+                "email": "paul@example.com",
+                "password": "StrongPass123!",
+                "organization_name": "Opsyn Labs",
+                "workspace_name": "Data Reliability",
+            },
+        )
         assert response.status_code == 201
         user = response.json()["user"]
         assert user["membership_role"] == "owner"
@@ -61,8 +67,11 @@ def test_self_service_registration_creates_owner_tenant_and_session() -> None:
 
 def test_self_service_registration_rejects_duplicate_email() -> None:
     payload = {
-        "full_name": "First Owner", "email": "owner@example.com", "password": "StrongPass123!",
-        "organization_name": "First Org", "workspace_name": "Reliability Operations",
+        "full_name": "First Owner",
+        "email": "owner@example.com",
+        "password": "StrongPass123!",
+        "organization_name": "First Org",
+        "workspace_name": "Reliability Operations",
     }
     with TestClient(create_app()) as client:
         assert client.post("/auth/register", json=payload).status_code == 201

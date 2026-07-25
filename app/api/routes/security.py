@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 
@@ -24,14 +25,17 @@ def audit_log(
         if action:
             query = query.where(AdministrativeAuditLogRecord.action == action)
         rows = db.scalars(query.order_by(AdministrativeAuditLogRecord.created_at.desc()).limit(limit)).all()
-        return [{
-            "id": row.id,
-            "action": row.action,
-            "resource_type": row.resource_type,
-            "resource_id": row.resource_id,
-            "outcome": row.outcome,
-            "actor_user_id": row.actor_user_id,
-            "ip_address": row.ip_address,
-            "details": json.loads(row.details_json or "{}"),
-            "created_at": row.created_at,
-        } for row in rows]
+        return [
+            {
+                "id": row.id,
+                "action": row.action,
+                "resource_type": row.resource_type,
+                "resource_id": row.resource_id,
+                "outcome": row.outcome,
+                "actor_user_id": row.actor_user_id,
+                "ip_address": row.ip_address,
+                "details": json.loads(row.details_json or "{}"),
+                "created_at": row.created_at,
+            }
+            for row in rows
+        ]

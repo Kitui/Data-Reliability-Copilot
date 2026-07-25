@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pandas as pd
 
 from app.profiler import profile_dataset
-from app.rules import detect_issues
 from app.quality_rules import execute_quality_rules
-from app.schemas import AuditResult, AuditRuleConfig, RuleDefinition, UploadedFileInfo, ScoringContext
+from app.rules import detect_issues
+from app.schemas import AuditResult, AuditRuleConfig, RuleDefinition, ScoringContext, UploadedFileInfo
 from app.scoring import score_audit
 from app.summaries import summarize_audit
 
@@ -33,7 +33,7 @@ def audit_dataframe(
     return AuditResult(
         audit_id=str(uuid4()),
         dataset_name=dataset_name,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
         upload=upload,
         rule_config=rule_config,
         profile=profile,

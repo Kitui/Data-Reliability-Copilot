@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from io import BytesIO, StringIO
 import csv
+from io import BytesIO, StringIO
 from pathlib import Path
 
 import pandas as pd
-
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 

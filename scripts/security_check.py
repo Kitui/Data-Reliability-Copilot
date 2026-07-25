@@ -11,15 +11,18 @@ PATTERNS = {
 SKIP = {".git", ".venv", "node_modules", "data"}
 
 failures = []
-for path in Path('.').rglob('*'):
+for path in Path(".").rglob("*"):
     if not path.is_file() or any(part in SKIP for part in path.parts):
         continue
-    if path.suffix.lower() in {'.png', '.jpg', '.jpeg', '.gif', '.zip', '.db'}:
+    if path.suffix.lower() in {".png", ".jpg", ".jpeg", ".gif", ".zip", ".db"}:
         continue
-    try: text = path.read_text(encoding='utf-8')
-    except UnicodeDecodeError: continue
+    try:
+        text = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        continue
     for label, pattern in PATTERNS.items():
-        if pattern.search(text): failures.append(f"{label}: {path}")
+        if pattern.search(text):
+            failures.append(f"{label}: {path}")
 if failures:
     raise SystemExit("Potential secrets detected:\n" + "\n".join(failures))
 print("Secret-pattern scan passed.")

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+
 import pandas as pd
 from fastapi.testclient import TestClient
 
@@ -15,12 +16,14 @@ def login(client: TestClient) -> None:
 
 
 def test_privacy_detector_classifies_common_sensitive_columns() -> None:
-    frame = pd.DataFrame({
-        "full_name": ["Amina Kamau", "Brian Otieno"],
-        "email": ["amina@example.com", "brian@example.com"],
-        "phone_number": ["+254712345678", "+254798765432"],
-        "ordinary_metric": [10, 20],
-    })
+    frame = pd.DataFrame(
+        {
+            "full_name": ["Amina Kamau", "Brian Otieno"],
+            "email": ["amina@example.com", "brian@example.com"],
+            "phone_number": ["+254712345678", "+254798765432"],
+            "ordinary_metric": [10, 20],
+        }
+    )
     scan = scan_dataframe(frame)
     by_column = {item["column"]: item for item in scan["findings"]}
     assert by_column["email"]["classification"] == "email"
@@ -37,10 +40,12 @@ def test_payment_card_uses_critical_sensitivity() -> None:
 
 
 def test_audit_generates_column_specific_privacy_findings() -> None:
-    frame = pd.DataFrame({
-        "email": ["one@example.com", "two@example.com"],
-        "city": ["Nairobi", "Kisumu"],
-    })
+    frame = pd.DataFrame(
+        {
+            "email": ["one@example.com", "two@example.com"],
+            "city": ["Nairobi", "Kisumu"],
+        }
+    )
     audit = audit_dataframe(frame, "privacy.csv")
     privacy = [issue for issue in audit.issues if issue.category == "privacy"]
     assert privacy

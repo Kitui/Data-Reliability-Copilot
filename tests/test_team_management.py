@@ -1,26 +1,26 @@
 from fastapi.testclient import TestClient
-from sqlalchemy import select
 
 from app.core.config import get_settings
-from app.db.models import OrganizationMembershipRecord, UserRecord
-from app.db.session import session_scope
 from app.main import create_app
 
 
 def login(client: TestClient, email: str | None = None, password: str | None = None) -> None:
-    response = client.post("/auth/login", json={
-        "email": email or get_settings().bootstrap_admin_email,
-        "password": password or get_settings().bootstrap_admin_password,
-    })
+    response = client.post(
+        "/auth/login",
+        json={
+            "email": email or get_settings().bootstrap_admin_email,
+            "password": password or get_settings().bootstrap_admin_password,
+        },
+    )
     assert response.status_code == 200
 
 
 def test_owner_can_invite_and_new_member_can_accept() -> None:
     with TestClient(create_app()) as client:
         login(client)
-        invited = client.post("/team/invitations", json={
-            "email": "analyst@example.com", "full_name": "Data Analyst", "role": "analyst"
-        })
+        invited = client.post(
+            "/team/invitations", json={"email": "analyst@example.com", "full_name": "Data Analyst", "role": "analyst"}
+        )
         assert invited.status_code == 201
         token = invited.json()["token"]
         client.post("/auth/logout")
@@ -34,11 +34,14 @@ def test_owner_can_invite_and_new_member_can_accept() -> None:
 def test_member_listing_and_role_update() -> None:
     with TestClient(create_app()) as client:
         login(client)
-        invited = client.post("/team/invitations", json={
-            "email": "viewer@example.com", "full_name": "Quality Viewer", "role": "viewer"
-        })
+        invited = client.post(
+            "/team/invitations", json={"email": "viewer@example.com", "full_name": "Quality Viewer", "role": "viewer"}
+        )
         token = invited.json()["token"]
-        assert client.post("/team/invitations/accept", json={"token": token, "password": "StrongPass123!"}).status_code == 201
+        assert (
+            client.post("/team/invitations/accept", json={"token": token, "password": "StrongPass123!"}).status_code
+            == 201
+        )
         members = client.get("/team/members")
         assert members.status_code == 200
         viewer = next(item for item in members.json() if item["email"] == "viewer@example.com")
@@ -59,16 +62,17 @@ def test_last_owner_cannot_remove_own_owner_role() -> None:
 def test_analyst_cannot_create_invitation() -> None:
     with TestClient(create_app()) as client:
         login(client)
-        invited = client.post("/team/invitations", json={
-            "email": "limited@example.com", "full_name": "Limited Analyst", "role": "analyst"
-        })
+        invited = client.post(
+            "/team/invitations",
+            json={"email": "limited@example.com", "full_name": "Limited Analyst", "role": "analyst"},
+        )
         token = invited.json()["token"]
         client.post("/team/invitations/accept", json={"token": token, "password": "StrongPass123!"})
         client.post("/auth/logout")
         login(client, "limited@example.com", "StrongPass123!")
-        denied = client.post("/team/invitations", json={
-            "email": "other@example.com", "full_name": "Other User", "role": "viewer"
-        })
+        denied = client.post(
+            "/team/invitations", json={"email": "other@example.com", "full_name": "Other User", "role": "viewer"}
+        )
         assert denied.status_code == 403
 
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC
 from typing import Any
 
 from app.jobs.worker import JobContext, JobHandler
@@ -41,6 +42,7 @@ class DatasetAuditHandler(JobHandler):
 class ScheduledAuditHandler(JobHandler):
     def execute(self, context: JobContext) -> dict[str, Any]:
         from time import perf_counter
+
         from sqlalchemy import select
 
         from app.api.dependencies import get_audit_store
@@ -62,18 +64,22 @@ class ScheduledAuditHandler(JobHandler):
 
         with Session() as db:
             run = db.get(ScheduledAuditRunRecord, run_id)
-            schedule = db.scalar(select(AuditScheduleRecord).where(
-                AuditScheduleRecord.id == schedule_id,
-                AuditScheduleRecord.workspace_id == context.workspace_id,
-            ))
+            schedule = db.scalar(
+                select(AuditScheduleRecord).where(
+                    AuditScheduleRecord.id == schedule_id,
+                    AuditScheduleRecord.workspace_id == context.workspace_id,
+                )
+            )
             if run is None or schedule is None:
                 raise RuntimeError("Scheduled audit run is unavailable.")
             run.status = "in_progress"
             db.commit()
-            dataset = db.scalar(select(DatasetRecord).where(
-                DatasetRecord.id == schedule.dataset_id,
-                DatasetRecord.workspace_id == context.workspace_id,
-            ))
+            dataset = db.scalar(
+                select(DatasetRecord).where(
+                    DatasetRecord.id == schedule.dataset_id,
+                    DatasetRecord.workspace_id == context.workspace_id,
+                )
+            )
             if dataset is None or not dataset.latest_audit_id:
                 raise RuntimeError("The scheduled dataset has no completed source audit.")
             source_audit_id = dataset.latest_audit_id
@@ -104,8 +110,9 @@ class ScheduledAuditHandler(JobHandler):
             persist_rule_executions(result.audit_id, result.rule_executions)
             register_audit_dataset(result, context.workspace_id, actor_name)
 
-            from datetime import datetime, timezone
-            completed = datetime.now(timezone.utc)
+            from datetime import datetime
+
+            completed = datetime.now(UTC)
             duration = int((perf_counter() - timer) * 1000)
             with Session() as db:
                 run = db.get(ScheduledAuditRunRecord, run_id)
@@ -134,8 +141,9 @@ class ScheduledAuditHandler(JobHandler):
                 "duration_ms": duration,
             }
         except Exception as exc:
-            from datetime import datetime, timezone
-            completed = datetime.now(timezone.utc)
+            from datetime import datetime
+
+            completed = datetime.now(UTC)
             duration = int((perf_counter() - timer) * 1000)
             with Session() as db:
                 run = db.get(ScheduledAuditRunRecord, run_id)

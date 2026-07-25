@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 from app.schemas import (
     AuditResult,
@@ -32,8 +32,7 @@ def generate_contract(audit: AuditResult, assigned_rules: Iterable[RuleDefinitio
         "row_count": audit.profile.row_count,
         "column_count": audit.profile.column_count,
         "observed_unique_candidates": [
-            column.name for column in audit.profile.columns
-            if column.unique_rate >= 0.98 and column.missing_rate == 0
+            column.name for column in audit.profile.columns if column.unique_rate >= 0.98 and column.missing_rate == 0
         ],
         "observed_allowed_values": {
             column.name: [item["value"] for item in column.stats.get("top_values", [])]
@@ -57,12 +56,10 @@ def generate_contract(audit: AuditResult, assigned_rules: Iterable[RuleDefinitio
         unique_columns = profile_summary["observed_unique_candidates"]
         allowed_values = profile_summary["observed_allowed_values"]
         numeric_ranges = {
-            name: NumericRangeRule(**bounds)
-            for name, bounds in profile_summary["observed_numeric_ranges"].items()
+            name: NumericRangeRule(**bounds) for name, bounds in profile_summary["observed_numeric_ranges"].items()
         }
         date_ranges = {
-            name: DateRangeRule(**bounds)
-            for name, bounds in profile_summary["observed_date_ranges"].items()
+            name: DateRangeRule(**bounds) for name, bounds in profile_summary["observed_date_ranges"].items()
         }
         return DataContract(
             dataset_name=audit.dataset_name,
@@ -91,13 +88,15 @@ def generate_contract(audit: AuditResult, assigned_rules: Iterable[RuleDefinitio
     for rule in rules:
         column = rule.column_name
         params = rule.parameters or {}
-        rule_sources.append({
-            "rule_id": rule.id,
-            "name": rule.name,
-            "rule_type": rule.rule_type,
-            "column": column,
-            "severity": rule.severity,
-        })
+        rule_sources.append(
+            {
+                "rule_id": rule.id,
+                "name": rule.name,
+                "rule_type": rule.rule_type,
+                "column": column,
+                "severity": rule.severity,
+            }
+        )
         if rule.rule_type == "duplicate_rows":
             continue
         if not column or column not in columns:

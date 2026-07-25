@@ -1,11 +1,16 @@
 from pathlib import Path
+
 from fastapi.testclient import TestClient
+
 from app.core.config import get_settings
 from app.main import create_app
 
 
 def login(client: TestClient) -> None:
-    response = client.post("/auth/login", json={"email": get_settings().bootstrap_admin_email, "password": get_settings().bootstrap_admin_password})
+    response = client.post(
+        "/auth/login",
+        json={"email": get_settings().bootstrap_admin_email, "password": get_settings().bootstrap_admin_password},
+    )
     assert response.status_code == 200
 
 
@@ -45,48 +50,57 @@ def test_workspace_creation_controls_are_exposed_in_ui() -> None:
     script = Path("app/static/app.js").read_text(encoding="utf-8")
     assert 'id="createWorkspaceButton"' in html
     assert 'id="workspaceCreateForm"' in html
-    assert 'async function createWorkspace' in script
-    assert 'Create and activate' in html
+    assert "async function createWorkspace" in script
+    assert "Create and activate" in html
 
 
 def test_all_audit_resources_are_isolated_after_workspace_switch() -> None:
     with TestClient(create_app()) as client:
         login(client)
-        created_audit = client.post('/audits/sample')
+        created_audit = client.post("/audits/sample")
         assert created_audit.status_code == 200
         payload = created_audit.json()
-        audit_id = payload['audit_id']
-        issue_id = payload['issues'][0]['id']
+        audit_id = payload["audit_id"]
+        issue_id = payload["issues"][0]["id"]
 
-        created_workspace = client.post('/workspaces', json={'name': 'Isolated Operations', 'description': 'Isolation verification'})
+        created_workspace = client.post(
+            "/workspaces", json={"name": "Isolated Operations", "description": "Isolation verification"}
+        )
         assert created_workspace.status_code == 200
         assert client.post(f"/workspaces/{created_workspace.json()['id']}/activate").status_code == 200
 
         protected_reads = [
-            f'/audits/{audit_id}',
-            f'/audits/{audit_id}/issues',
-            f'/audits/{audit_id}/issues/{issue_id}/lifecycle',
-            f'/audits/{audit_id}/score-breakdown',
-            f'/audits/{audit_id}/report',
-            f'/audits/{audit_id}/report.md',
-            f'/audits/{audit_id}/report.html',
-            f'/audits/{audit_id}/remediation',
-            f'/audits/{audit_id}/contract',
-            f'/audits/{audit_id}/ml-readiness',
+            f"/audits/{audit_id}",
+            f"/audits/{audit_id}/issues",
+            f"/audits/{audit_id}/issues/{issue_id}/lifecycle",
+            f"/audits/{audit_id}/score-breakdown",
+            f"/audits/{audit_id}/report",
+            f"/audits/{audit_id}/report.md",
+            f"/audits/{audit_id}/report.html",
+            f"/audits/{audit_id}/remediation",
+            f"/audits/{audit_id}/contract",
+            f"/audits/{audit_id}/ml-readiness",
         ]
         for endpoint in protected_reads:
             assert client.get(endpoint).status_code == 404, endpoint
 
-        assert client.post(f'/audits/{audit_id}/rerun').status_code == 404
-        assert client.post(f'/audits/{audit_id}/score/recalculate', json={}).status_code == 404
-        assert client.post(f'/audits/{audit_id}/issues/{issue_id}/comments', json={'body': 'cross-workspace attempt'}).status_code == 404
-        assert client.patch(f'/audits/{audit_id}/issues/{issue_id}', json={'status': 'triaged'}).status_code == 404
-        assert client.post(f'/audits/{audit_id}/issues/{issue_id}/apply-recommendation').status_code == 404
+        assert client.post(f"/audits/{audit_id}/rerun").status_code == 404
+        assert client.post(f"/audits/{audit_id}/score/recalculate", json={}).status_code == 404
+        assert (
+            client.post(
+                f"/audits/{audit_id}/issues/{issue_id}/comments", json={"body": "cross-workspace attempt"}
+            ).status_code
+            == 404
+        )
+        assert client.patch(f"/audits/{audit_id}/issues/{issue_id}", json={"status": "triaged"}).status_code == 404
+        assert client.post(f"/audits/{audit_id}/issues/{issue_id}/apply-recommendation").status_code == 404
 
 
 def test_workspace_switch_clears_stale_audit_context_in_frontend() -> None:
-    script = Path('app/static/app.js').read_text(encoding='utf-8')
-    assert 'function clearWorkspaceScopedState()' in script
-    assert 'function clearWorkspaceAuditUrl()' in script
-    assert 'That audit is not available in the active workspace.' in script
-    assert 'if (!response.ok)' in script[script.index('async function openAudit'):script.index('function renderAudit')]
+    script = Path("app/static/app.js").read_text(encoding="utf-8")
+    assert "function clearWorkspaceScopedState()" in script
+    assert "function clearWorkspaceAuditUrl()" in script
+    assert "That audit is not available in the active workspace." in script
+    assert (
+        "if (!response.ok)" in script[script.index("async function openAudit") : script.index("function renderAudit")]
+    )

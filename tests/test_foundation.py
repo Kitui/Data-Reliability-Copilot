@@ -1,4 +1,5 @@
 from pathlib import Path
+
 from fastapi.testclient import TestClient
 
 from app.core.config import get_settings
@@ -50,8 +51,8 @@ def test_primary_navigation_uses_page_router():
     html = Path("app/static/index.html").read_text(encoding="utf-8")
     script = Path("app/static/app.js").read_text(encoding="utf-8")
     assert 'data-page-route="datasets"' in html
-    assert 'const PAGE_ROUTES' in script
-    assert 'datasets: openDatasetsPage' in script
+    assert "const PAGE_ROUTES" in script
+    assert "datasets: openDatasetsPage" in script
     assert 'event.target.closest("[data-page-route]")' in script
 
 
@@ -68,7 +69,7 @@ def test_dataset_import_has_explicit_trigger_and_visible_status():
     script = Path("app/static/app.js").read_text(encoding="utf-8")
     assert 'id="datasetImportButton"' in html
     assert 'id="datasetImportStatus"' in html
-    assert 'setDatasetImportStatus' in script
+    assert "setDatasetImportStatus" in script
     assert 'document.querySelector("#datasetImportInput")?.click()' in script
 
 
@@ -86,11 +87,11 @@ def test_dataset_registry_uses_metric_icon_and_delete_action():
     styles = Path("app/static/styles.css").read_text(encoding="utf-8")
     assert "function datasetRegistryIcon()" in script
     assert 'class="dataset-registry-icon"' in script
-    assert 'data-delete-dataset' in script
+    assert "data-delete-dataset" in script
     assert 'method: "DELETE"' in script
     assert "dataset-delete-button" in styles
-    assert 'styles.css?v=0.16.20' in html
-    assert 'app.js?v=0.16.20' in html
+    assert "styles.css?v=0.16.20" in html
+    assert "app.js?v=0.16.20" in html
 
 
 def test_rules_workspace_uses_compact_tabs_and_sample_rule_loader():
@@ -99,8 +100,8 @@ def test_rules_workspace_uses_compact_tabs_and_sample_rule_loader():
     js = Path("app/static/app.js").read_text(encoding="utf-8")
     assert 'id="loadSampleRuleButton"' in html
     assert 'class="rules-tabs"' in html
-    assert 'border-bottom-color:#5145e5' in css
-    assert 'function loadSampleQualityRule()' in js
+    assert "border-bottom-color:#5145e5" in css
+    assert "function loadSampleQualityRule()" in js
     assert Path("documents/SAMPLE_QUALITY_RULE.json").is_file()
 
 
@@ -120,13 +121,13 @@ def test_dataset_schema_is_wide_and_side_cards_fit_content():
     html = Path("app/static/index.html").read_text(encoding="utf-8")
     styles = Path("app/static/styles.css").read_text(encoding="utf-8")
     aside_start = html.index('<aside class="dataset-details-stack">')
-    aside_end = html.index('</aside>', aside_start)
-    schema_pos = html.index('dataset-schema-wide')
+    aside_end = html.index("</aside>", aside_start)
+    schema_pos = html.index("dataset-schema-wide")
     assert schema_pos > aside_end
-    assert '.dataset-schema-wide' in styles
-    assert 'grid-column:1;' in styles
-    assert '.dataset-details-stack>.dashboard-card' in styles
-    assert 'height:auto!important' in styles
+    assert ".dataset-schema-wide" in styles
+    assert "grid-column:1;" in styles
+    assert ".dataset-details-stack>.dashboard-card" in styles
+    assert "height:auto!important" in styles
 
 
 def test_dataset_registry_is_fluid_and_has_rows_per_page_controls():
@@ -136,21 +137,23 @@ def test_dataset_registry_is_fluid_and_has_rows_per_page_controls():
     assert 'id="datasetRowsPerPage"' in html
     assert 'id="datasetPreviousPage"' in html
     assert 'id="datasetNextPage"' in html
-    assert 'pageSize: 10' in script
-    assert 'rows.slice(startIndex, startIndex + datasetState.pageSize)' in script
-    assert '.dataset-registry{height:auto!important' in styles
+    assert "pageSize: 10" in script
+    assert "rows.slice(startIndex, startIndex + datasetState.pageSize)" in script
+    assert ".dataset-registry{height:auto!important" in styles
 
 
 def test_primary_navigation_orders_datasets_before_audit():
     html = Path("app/static/index.html").read_text(encoding="utf-8")
-    assert html.index('id="overviewNavButton"') < html.index('id="datasetsNavButton"') < html.index('id="auditNavButton"')
+    assert (
+        html.index('id="overviewNavButton"') < html.index('id="datasetsNavButton"') < html.index('id="auditNavButton"')
+    )
 
 
 def test_dataset_audit_handoff_and_rerun_are_wired():
     script = Path("app/static/app.js").read_text(encoding="utf-8")
-    assert 'async function handleDatasetAction(action, row)' in script
+    assert "async function handleDatasetAction(action, row)" in script
     assert 'url.searchParams.set("page", "audit")' in script
-    assert 'await openAudit(row.latest_audit_id)' in script
+    assert "await openAudit(row.latest_audit_id)" in script
     assert "addEventListener('click', rerunSelectedAudit)" in script
     assert "`/audits/${state.audit.audit_id}/rerun`" in script
 
@@ -160,17 +163,17 @@ def test_add_workspace_action_is_visible_and_labeled():
     styles = Path("app/static/styles.css").read_text(encoding="utf-8")
     assert 'id="createWorkspaceButton"' in html
     assert 'workspace-add-label">Add workspace<' in html
-    assert '.workspace-add-button{width:auto!important' in styles
+    assert ".workspace-add-button{width:auto!important" in styles
 
 
 def test_audit_compare_action_is_visible_and_state_aware():
     html = Path("app/static/index.html").read_text(encoding="utf-8")
     javascript = Path("app/static/app.js").read_text(encoding="utf-8")
     assert 'id="auditCompareButton"' in html
-    assert 'Compare with Previous Run' in html
-    assert 'previousAuditForCurrentV2' in javascript
-    assert 'updateAuditCompareActionV2' in javascript
-    assert 'button.hidden = false' in javascript
+    assert "Compare with Previous Run" in html
+    assert "previousAuditForCurrentV2" in javascript
+    assert "updateAuditCompareActionV2" in javascript
+    assert "button.hidden = false" in javascript
 
 
 def test_audit_comparison_opens_dedicated_visible_panel():
@@ -206,6 +209,7 @@ def test_rule_save_flow_verifies_persistence_and_shows_feedback():
     assert "Rule created and saved." in script
     assert "Rule created, saved, and assigned." in script
 
+
 def test_rule_editor_uses_full_height_scroll_region():
     styles = Path("app/static/styles.css").read_text(encoding="utf-8")
     page = Path("app/static/index.html").read_text(encoding="utf-8")
@@ -214,6 +218,7 @@ def test_rule_editor_uses_full_height_scroll_region():
     assert "overflow-y:auto" in styles
     assert "position:static" in styles
     assert "styles.css?v=0.16.20" in page
+
 
 def test_existing_rule_can_be_assigned_from_editor():
     script = Path("app/static/app.js").read_text(encoding="utf-8")
@@ -224,6 +229,7 @@ def test_existing_rule_can_be_assigned_from_editor():
 
 def test_feature_17_remediation_applies_deterministic_corrections():
     import pandas as pd
+
     from app.auditor import audit_dataframe
     from app.remediation import apply_remediation_actions
 
@@ -242,11 +248,22 @@ def test_feature_17_remediation_preview_schema_supports_score_delta():
     from app.schemas import RemediationPreview
 
     preview = RemediationPreview(
-        audit_id="audit-1", selected_actions=1, rows_before=10, rows_after=9,
-        columns_before=3, columns_after=3, score_before=70, projected_score=80,
-        projected_score_delta=10, issues_before=3, projected_issues=1,
-        changed_cells=2, removed_rows=1, changed_columns=["email"],
-        sample_changes=[], warnings=[],
+        audit_id="audit-1",
+        selected_actions=1,
+        rows_before=10,
+        rows_after=9,
+        columns_before=3,
+        columns_after=3,
+        score_before=70,
+        projected_score=80,
+        projected_score_delta=10,
+        issues_before=3,
+        projected_issues=1,
+        changed_cells=2,
+        removed_rows=1,
+        changed_columns=["email"],
+        sample_changes=[],
+        warnings=[],
     )
     assert preview.projected_score_delta == 10
 
@@ -257,13 +274,13 @@ def test_remediation_has_dedicated_page_route_and_working_audit_action():
     styles = Path("app/static/styles.css").read_text(encoding="utf-8")
     assert 'data-page-route="remediation"' in html
     assert 'id="remediationPageHeader"' in html
-    assert 'remediation: openRemediationPage' in script
+    assert "remediation: openRemediationPage" in script
     assert "navigateToPage('remediation')" in script
     assert 'id="remediationPage"' in html
     assert 'id="tab-remediation" class="tab-panel remediation-standalone-panel"' in html
     assert '["#overviewPage", "#auditPage", "#datasetsPage", "#rulesPage", "#teamPage", "#remediationPage"]' in script
-    assert 'animatePage(remediationPage)' in script
-    assert '.remediation-page .remediation-standalone-panel { display: block; }' in styles
+    assert "animatePage(remediationPage)" in script
+    assert ".remediation-page .remediation-standalone-panel { display: block; }" in styles
 
 
 def test_remediation_uses_in_app_risk_approval_dialog():
@@ -286,14 +303,17 @@ def test_rules_contracts_use_compact_remediation_typography():
 
 def test_sensitive_field_remediation_preserves_email_format_and_uniqueness():
     import pandas as pd
-    from app.auditor import audit_dataframe
-    from app.remediation import apply_remediation_actions
-    from app.privacy import EMAIL_RE
 
-    frame = pd.DataFrame({
-        "customer_id": ["C001", "C002", "C003"],
-        "email": ["alice@example.com", "bob@example.com", "carol@example.com"],
-    })
+    from app.auditor import audit_dataframe
+    from app.privacy import EMAIL_RE
+    from app.remediation import apply_remediation_actions
+
+    frame = pd.DataFrame(
+        {
+            "customer_id": ["C001", "C002", "C003"],
+            "email": ["alice@example.com", "bob@example.com", "carol@example.com"],
+        }
+    )
     audit = audit_dataframe(frame, "customers.csv")
     privacy_issue = next(issue for issue in audit.issues if issue.category == "privacy")
     corrected, stats = apply_remediation_actions(frame, audit, [privacy_issue.id])
@@ -306,6 +326,7 @@ def test_sensitive_field_remediation_preserves_email_format_and_uniqueness():
 
 def test_sensitive_field_remediation_does_not_use_one_shared_mask_value():
     import pandas as pd
+
     from app.auditor import audit_dataframe
     from app.remediation import apply_remediation_actions
 
@@ -337,21 +358,24 @@ def test_feature_18_dataset_versions_workspace_and_routes_exist():
     styles = Path("app/static/styles.css").read_text(encoding="utf-8")
     assert 'data-page-route="versions"' in html
     assert 'id="versionsPage"' in html
-    assert 'versions: openVersionsPage' in script
-    assert 'compareDatasetVersions' in script
+    assert "versions: openVersionsPage" in script
+    assert "compareDatasetVersions" in script
     assert '@router.get("/{dataset_id}/versions")' in route
     assert '@router.get("/{dataset_id}/versions/compare")' in route
-    assert 'from app.api.dependencies import get_audit_store' in route
-    assert 'neutral dataset version history rows' in styles
+    assert "from app.api.dependencies import get_audit_store" in route
+    assert "neutral dataset version history rows" in styles
 
 
 def test_audit_comparison_tracks_persistent_issues_and_structural_deltas():
     import pandas as pd
+
     from app.auditor import audit_dataframe
     from app.comparison import compare_audits
 
     baseline = audit_dataframe(pd.DataFrame({"id": [1, 2, 2], "name": ["A", None, "C"]}), "versions.csv")
-    candidate = audit_dataframe(pd.DataFrame({"id": [1, 2], "name": ["A", None], "status": ["ok", "ok"]}), "versions.csv")
+    candidate = audit_dataframe(
+        pd.DataFrame({"id": [1, 2], "name": ["A", None], "status": ["ok", "ok"]}), "versions.csv"
+    )
     result = compare_audits(baseline, candidate)
     assert result.row_count_delta == -1
     assert result.column_count_delta == 1
@@ -398,7 +422,7 @@ def test_feature_19_schema_drift_workspace_is_wired():
     assert "async function loadSchemaDrift" in script
     assert "driftTrendChart" in script and "driftSeverityChart" in script and "driftTypeChart" in script
     assert ".drift-workspace-grid" in styles
-    assert '/static/app.js?v=' in html
+    assert "/static/app.js?v=" in html
 
 
 def test_feature_19_schema_drift_router_is_registered():
@@ -406,8 +430,8 @@ def test_feature_19_schema_drift_router_is_registered():
     route = Path("app/api/routes/schema_drift.py").read_text(encoding="utf-8")
     assert "application.include_router(schema_drift.router)" in main
     assert 'APIRouter(prefix="/schema-drift"' in route
-    assert 'def list_schema_drift' in route
-    assert 'def export_schema_drift' in route
+    assert "def list_schema_drift" in route
+    assert "def export_schema_drift" in route
 
 
 def test_version_import_confirmation_uses_defined_date_formatter():
@@ -418,12 +442,13 @@ def test_version_import_confirmation_uses_defined_date_formatter():
 
 def test_version_import_result_navigation_uses_valid_routes_and_context():
     script = Path("app/static/app.js").read_text(encoding="utf-8")
-    assert 'versionWorkspaceState.pendingDatasetId = Number(body.dataset_id)' in script
-    assert 'driftState.pendingDatasetId = Number(body.dataset_id)' in script
+    assert "versionWorkspaceState.pendingDatasetId = Number(body.dataset_id)" in script
+    assert "driftState.pendingDatasetId = Number(body.dataset_id)" in script
     assert 'navigateToPage("versions")' in script
     assert 'navigateToPage("drift")' in script
     assert 'navigateToPage("schema-drift")' not in script
-    assert 'versionsState.datasetId' not in script
+    assert "versionsState.datasetId" not in script
+
 
 def test_feature_20_scheduled_audits_assets_are_wired():
     html = Path("app/static/index.html").read_text(encoding="utf-8")
@@ -431,7 +456,7 @@ def test_feature_20_scheduled_audits_assets_are_wired():
     assert 'id="schedulesPage"' in html
     assert 'id="schedulesNavButton"' in html
     assert 'id="newScheduleButton"' in html
-    assert 'schedules: openSchedulesPage' in js
+    assert "schedules: openSchedulesPage" in js
     assert "fetch('/schedules')" in js
 
 
@@ -445,7 +470,6 @@ def test_feature_20_navigation_is_grouped_and_workspace_selector_is_in_sidebar()
 
 
 def test_scheduled_audit_score_is_persisted_as_numeric_and_empty_form_error_is_hidden() -> None:
-    schedules = (Path(__file__).parents[1] / "app" / "api" / "routes" / "schedules.py").read_text(encoding="utf-8")
     handlers = (Path(__file__).parents[1] / "app" / "jobs" / "handlers.py").read_text(encoding="utf-8")
     html = (Path(__file__).parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
     javascript = (Path(__file__).parents[1] / "app" / "static" / "app.js").read_text(encoding="utf-8")
@@ -467,7 +491,7 @@ def test_feature_20_3_schedule_controls_calendar_and_delete_dialog_are_wired() -
     assert "confirm('Delete this audit schedule?')" not in javascript
     assert "confirmDeleteSchedule" in javascript
     assert '.schedule-actions button[type="button"]' in styles
-    assert '/static/app.js?v=' in html
+    assert "/static/app.js?v=" in html
 
 
 def test_feature_20_4_month_calendar_polished_table_and_worker_are_wired() -> None:
@@ -489,7 +513,7 @@ def test_feature_20_4_month_calendar_polished_table_and_worker_are_wired() -> No
     assert "asyncio.to_thread(schedules.process_all_due)" not in main
     assert "def process_all_due" in schedules
     assert '@router.post("/dispatch"' in schedules
-    assert '/static/app.js?v=' in html
+    assert "/static/app.js?v=" in html
 
 
 def test_collapsible_navigation_shell_and_workspace_footer_are_wired():
@@ -501,9 +525,9 @@ def test_collapsible_navigation_shell_and_workspace_footer_are_wired():
     assert 'data-nav-group="ai-assistance"' in html
     assert 'class="sidebar-footer"' in html
     assert 'class="nav-new"' not in html
-    assert 'body.sidebar-collapsed .nav-group:hover>.nav-group-items' in css
-    assert 'position:sticky' in css
-    assert 'drc-sidebar-collapsed' in js
+    assert "body.sidebar-collapsed .nav-group:hover>.nav-group-items" in css
+    assert "position:sticky" in css
+    assert "drc-sidebar-collapsed" in js
 
 
 def test_final_ui_consistency_review_is_wired() -> None:
@@ -511,8 +535,8 @@ def test_final_ui_consistency_review_is_wired() -> None:
     html = (root / "app" / "static" / "index.html").read_text(encoding="utf-8")
     javascript = (root / "app" / "static" / "app.js").read_text(encoding="utf-8")
     styles = (root / "app" / "static" / "styles.css").read_text(encoding="utf-8")
-    assert '/static/styles.css?v=0.25.0' in html
-    assert '/static/app.js?v=' in html
+    assert "/static/styles.css?v=0.25.0" in html
+    assert "/static/app.js?v=" in html
     assert 'id="appMessageDialog"' in html
     assert 'aria-live="polite"' in html
     assert "confirmAppAction" in javascript

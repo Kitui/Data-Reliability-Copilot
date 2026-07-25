@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import select
@@ -13,7 +13,7 @@ from app.jobs.types import JobStatus, JobType
 
 
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def serialise_job(row: BackgroundJobRecord) -> dict[str, Any]:
@@ -36,14 +36,22 @@ def serialise_job(row: BackgroundJobRecord) -> dict[str, Any]:
     }
 
 
-def create_job(*, workspace_id: int, created_by_user_id: int | None, job_type: JobType | str,
-               idempotency_key: str, payload: dict[str, Any]) -> tuple[BackgroundJobRecord, bool]:
+def create_job(
+    *,
+    workspace_id: int,
+    created_by_user_id: int | None,
+    job_type: JobType | str,
+    idempotency_key: str,
+    payload: dict[str, Any],
+) -> tuple[BackgroundJobRecord, bool]:
     Session = get_session_factory()
     with Session() as db:
-        existing = db.scalar(select(BackgroundJobRecord).where(
-            BackgroundJobRecord.workspace_id == workspace_id,
-            BackgroundJobRecord.idempotency_key == idempotency_key,
-        ))
+        existing = db.scalar(
+            select(BackgroundJobRecord).where(
+                BackgroundJobRecord.workspace_id == workspace_id,
+                BackgroundJobRecord.idempotency_key == idempotency_key,
+            )
+        )
         if existing is not None:
             return existing, False
         row = BackgroundJobRecord(
@@ -62,10 +70,12 @@ def create_job(*, workspace_id: int, created_by_user_id: int | None, job_type: J
             db.commit()
         except IntegrityError:
             db.rollback()
-            existing = db.scalar(select(BackgroundJobRecord).where(
-                BackgroundJobRecord.workspace_id == workspace_id,
-                BackgroundJobRecord.idempotency_key == idempotency_key,
-            ))
+            existing = db.scalar(
+                select(BackgroundJobRecord).where(
+                    BackgroundJobRecord.workspace_id == workspace_id,
+                    BackgroundJobRecord.idempotency_key == idempotency_key,
+                )
+            )
             if existing is None:
                 raise
             return existing, False
@@ -85,14 +95,27 @@ def get_job(job_id: int, workspace_id: int | None = None) -> BackgroundJobRecord
 def list_jobs(workspace_id: int, *, limit: int = 50) -> list[BackgroundJobRecord]:
     Session = get_session_factory()
     with Session() as db:
-        return list(db.scalars(select(BackgroundJobRecord).where(
-            BackgroundJobRecord.workspace_id == workspace_id,
-        ).order_by(BackgroundJobRecord.created_at.desc()).limit(limit)).all())
+        return list(
+            db.scalars(
+                select(BackgroundJobRecord)
+                .where(
+                    BackgroundJobRecord.workspace_id == workspace_id,
+                )
+                .order_by(BackgroundJobRecord.created_at.desc())
+                .limit(limit)
+            ).all()
+        )
 
 
-def update_job(job_id: int, *, status: JobStatus | str | None = None, progress: int | None = None,
-               result: dict[str, Any] | None = None, error_message: str | None = None,
-               increment_attempt: bool = False) -> BackgroundJobRecord | None:
+def update_job(
+    job_id: int,
+    *,
+    status: JobStatus | str | None = None,
+    progress: int | None = None,
+    result: dict[str, Any] | None = None,
+    error_message: str | None = None,
+    increment_attempt: bool = False,
+) -> BackgroundJobRecord | None:
     Session = get_session_factory()
     with Session() as db:
         row = db.get(BackgroundJobRecord, job_id)
@@ -126,10 +149,12 @@ def update_job(job_id: int, *, status: JobStatus | str | None = None, progress: 
 def cancel_job(job_id: int, workspace_id: int) -> BackgroundJobRecord | None:
     Session = get_session_factory()
     with Session() as db:
-        row = db.scalar(select(BackgroundJobRecord).where(
-            BackgroundJobRecord.id == job_id,
-            BackgroundJobRecord.workspace_id == workspace_id,
-        ))
+        row = db.scalar(
+            select(BackgroundJobRecord).where(
+                BackgroundJobRecord.id == job_id,
+                BackgroundJobRecord.workspace_id == workspace_id,
+            )
+        )
         if row is None:
             return None
         if row.status in {JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED}:

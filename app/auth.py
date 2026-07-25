@@ -15,11 +15,13 @@ def ensure_bootstrap_admin() -> None:
         existing = db.scalar(select(UserRecord).where(UserRecord.email == email))
         if existing:
             return
-        db.add(UserRecord(
-            email=email,
-            full_name=settings.bootstrap_admin_name,
-            password_hash=hash_password(settings.bootstrap_admin_password),
-            role="admin",
-            is_active=1,
-            created_at=utcnow(),
-        ))
+        db.add(
+            UserRecord(
+                email=email,
+                full_name=settings.bootstrap_admin_name,
+                password_hash=hash_password(settings.bootstrap_admin_password),
+                role="admin",
+                is_active=1,
+                created_at=utcnow(),
+            )
+        )

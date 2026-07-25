@@ -6,7 +6,7 @@ import threading
 import time
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import Request
@@ -20,7 +20,7 @@ class JsonFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         payload: dict[str, Any] = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
@@ -28,8 +28,16 @@ class JsonFormatter(logging.Formatter):
             "environment": get_settings().environment,
         }
         for field in (
-            "request_id", "workspace_id", "user_id", "job_id", "audit_id",
-            "route", "method", "status_code", "duration_ms", "error_type",
+            "request_id",
+            "workspace_id",
+            "user_id",
+            "job_id",
+            "audit_id",
+            "route",
+            "method",
+            "status_code",
+            "duration_ms",
+            "error_type",
         ):
             value = getattr(record, field, None)
             if value is not None:

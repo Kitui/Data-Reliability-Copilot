@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from app.api.routes.audits import _utc_datetime
@@ -6,7 +6,7 @@ from app.api.routes.audits import _utc_datetime
 
 def test_naive_sqlite_audit_time_is_canonical_utc():
     value = _utc_datetime(datetime(2026, 7, 24, 16, 19, 14))
-    assert value.tzinfo is timezone.utc
+    assert value.tzinfo is UTC
     assert value.isoformat() == "2026-07-24T16:19:14+00:00"
 
 

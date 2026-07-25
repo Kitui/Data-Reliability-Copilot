@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from datetime import timedelta
 import secrets
+from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func, select
-from sqlalchemy.exc import IntegrityError
 
 from app.api.auth_dependencies import require_roles, require_user
 from app.core.security import hash_password, token_digest, utcnow
@@ -102,20 +101,24 @@ def list_invitations(current: dict[str, object] = Depends(require_roles("owner",
                 expires_at = expires_at.replace(tzinfo=now.tzinfo)
             if status == "pending" and expires_at <= now:
                 invitation.status = status = "expired"
-            output.append({
-                "id": invitation.id,
-                "email": invitation.email,
-                "full_name": invitation.full_name,
-                "role": invitation.role,
-                "status": status,
-                "created_at": invitation.created_at,
-                "expires_at": invitation.expires_at,
-            })
+            output.append(
+                {
+                    "id": invitation.id,
+                    "email": invitation.email,
+                    "full_name": invitation.full_name,
+                    "role": invitation.role,
+                    "status": status,
+                    "created_at": invitation.created_at,
+                    "expires_at": invitation.expires_at,
+                }
+            )
         return output
 
 
 @router.post("/invitations", status_code=201)
-def create_invitation(payload: InvitationCreate, current: dict[str, object] = Depends(require_roles("owner", "admin"))) -> dict[str, object]:
+def create_invitation(
+    payload: InvitationCreate, current: dict[str, object] = Depends(require_roles("owner", "admin"))
+) -> dict[str, object]:
     role = _validate_role(payload.role)
     if current["membership_role"] == "admin" and role == "owner":
         raise HTTPException(status_code=403, detail="Only an owner can invite another owner.")
@@ -126,17 +129,21 @@ def create_invitation(payload: InvitationCreate, current: dict[str, object] = De
     with session_scope() as db:
         existing_user = db.scalar(select(UserRecord).where(UserRecord.email == email))
         if existing_user:
-            existing_membership = db.scalar(select(OrganizationMembershipRecord).where(
-                OrganizationMembershipRecord.organization_id == organization_id,
-                OrganizationMembershipRecord.user_id == existing_user.id,
-            ))
+            existing_membership = db.scalar(
+                select(OrganizationMembershipRecord).where(
+                    OrganizationMembershipRecord.organization_id == organization_id,
+                    OrganizationMembershipRecord.user_id == existing_user.id,
+                )
+            )
             if existing_membership:
                 raise HTTPException(status_code=409, detail="This user is already a member of the organization.")
-        pending = db.scalar(select(TeamInvitationRecord).where(
-            TeamInvitationRecord.organization_id == organization_id,
-            TeamInvitationRecord.email == email,
-            TeamInvitationRecord.status == "pending",
-        ))
+        pending = db.scalar(
+            select(TeamInvitationRecord).where(
+                TeamInvitationRecord.organization_id == organization_id,
+                TeamInvitationRecord.email == email,
+                TeamInvitationRecord.status == "pending",
+            )
+        )
         if pending:
             pending.status = "revoked"
         invitation = TeamInvitationRecord(
@@ -168,7 +175,9 @@ def create_invitation(payload: InvitationCreate, current: dict[str, object] = De
 def accept_invitation(payload: InvitationAccept) -> dict[str, object]:
     now = utcnow()
     with session_scope() as db:
-        invitation = db.scalar(select(TeamInvitationRecord).where(TeamInvitationRecord.token_hash == token_digest(payload.token)))
+        invitation = db.scalar(
+            select(TeamInvitationRecord).where(TeamInvitationRecord.token_hash == token_digest(payload.token))
+        )
         if not invitation or invitation.status != "pending":
             raise HTTPException(status_code=400, detail="Invitation is invalid or no longer available.")
         expires_at = invitation.expires_at
@@ -189,10 +198,12 @@ def accept_invitation(payload: InvitationAccept) -> dict[str, object]:
             )
             db.add(user)
             db.flush()
-        membership = db.scalar(select(OrganizationMembershipRecord).where(
-            OrganizationMembershipRecord.organization_id == invitation.organization_id,
-            OrganizationMembershipRecord.user_id == user.id,
-        ))
+        membership = db.scalar(
+            select(OrganizationMembershipRecord).where(
+                OrganizationMembershipRecord.organization_id == invitation.organization_id,
+                OrganizationMembershipRecord.user_id == user.id,
+            )
+        )
         if not membership:
             membership = OrganizationMembershipRecord(
                 organization_id=invitation.organization_id,
@@ -203,11 +214,18 @@ def accept_invitation(payload: InvitationAccept) -> dict[str, object]:
             db.add(membership)
         invitation.status = "accepted"
         invitation.accepted_at = now
-        return {"email": user.email, "full_name": user.full_name, "role": invitation.role, "message": "Invitation accepted. You can now sign in."}
+        return {
+            "email": user.email,
+            "full_name": user.full_name,
+            "role": invitation.role,
+            "message": "Invitation accepted. You can now sign in.",
+        }
 
 
 @router.patch("/members/{membership_id}/role")
-def update_member_role(membership_id: int, payload: RoleUpdate, current: dict[str, object] = Depends(require_roles("owner", "admin"))) -> dict[str, object]:
+def update_member_role(
+    membership_id: int, payload: RoleUpdate, current: dict[str, object] = Depends(require_roles("owner", "admin"))
+) -> dict[str, object]:
     role = _validate_role(payload.role)
     organization_id = current["organization"]["id"]
     with session_scope() as db:
@@ -217,10 +235,14 @@ def update_member_role(membership_id: int, payload: RoleUpdate, current: dict[st
         if current["membership_role"] == "admin" and (membership.role == "owner" or role == "owner"):
             raise HTTPException(status_code=403, detail="Administrators cannot manage owner roles.")
         if membership.user_id == current["id"] and membership.role == "owner" and role != "owner":
-            owner_count = db.scalar(select(func.count()).select_from(OrganizationMembershipRecord).where(
-                OrganizationMembershipRecord.organization_id == organization_id,
-                OrganizationMembershipRecord.role == "owner",
-            ))
+            owner_count = db.scalar(
+                select(func.count())
+                .select_from(OrganizationMembershipRecord)
+                .where(
+                    OrganizationMembershipRecord.organization_id == organization_id,
+                    OrganizationMembershipRecord.role == "owner",
+                )
+            )
             if owner_count <= 1:
                 raise HTTPException(status_code=409, detail="The organization must retain at least one owner.")
         membership.role = role
@@ -229,7 +251,11 @@ def update_member_role(membership_id: int, payload: RoleUpdate, current: dict[st
 
 
 @router.patch("/members/{membership_id}/status")
-def update_member_status(membership_id: int, payload: MemberStatusUpdate, current: dict[str, object] = Depends(require_roles("owner", "admin"))) -> dict[str, object]:
+def update_member_status(
+    membership_id: int,
+    payload: MemberStatusUpdate,
+    current: dict[str, object] = Depends(require_roles("owner", "admin")),
+) -> dict[str, object]:
     organization_id = current["organization"]["id"]
     with session_scope() as db:
         membership = db.get(OrganizationMembershipRecord, membership_id)
@@ -245,7 +271,9 @@ def update_member_status(membership_id: int, payload: MemberStatusUpdate, curren
 
 
 @router.delete("/invitations/{invitation_id}")
-def revoke_invitation(invitation_id: int, current: dict[str, object] = Depends(require_roles("owner", "admin"))) -> dict[str, str]:
+def revoke_invitation(
+    invitation_id: int, current: dict[str, object] = Depends(require_roles("owner", "admin"))
+) -> dict[str, str]:
     organization_id = current["organization"]["id"]
     with session_scope() as db:
         invitation = db.get(TeamInvitationRecord, invitation_id)

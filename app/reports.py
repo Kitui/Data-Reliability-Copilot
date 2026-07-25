@@ -71,9 +71,7 @@ def build_markdown_report(audit: AuditResult) -> str:
         ]
     )
     for column in audit.profile.columns:
-        lines.append(
-            f"| {column.name} | {column.inferred_type} | {column.missing_rate:.0%} | {column.unique_count} |"
-        )
+        lines.append(f"| {column.name} | {column.inferred_type} | {column.missing_rate:.0%} | {column.unique_count} |")
 
     return "\n".join(lines) + "\n"
 
@@ -107,10 +105,13 @@ def build_html_report(audit: AuditResult) -> str:
     )
     focus_items = "\n".join(f"<li>{escape(item)}</li>" for item in audit.summary.recommended_focus)
     remediation_items = "\n".join(f"<li>{escape(item)}</li>" for item in audit.summary.remediation_plan)
-    high_priority_items = "\n".join(
-        f"<li><strong>{escape(issue.id)}</strong>: {escape(issue.title)} ({issue.affected_rows} affected rows)</li>"
-        for issue in high_priority
-    ) or "<li>No critical or high issues detected.</li>"
+    high_priority_items = (
+        "\n".join(
+            f"<li><strong>{escape(issue.id)}</strong>: {escape(issue.title)} ({issue.affected_rows} affected rows)</li>"
+            for issue in high_priority
+        )
+        or "<li>No critical or high issues detected.</li>"
+    )
 
     return f"""<!doctype html>
 <html lang="en">

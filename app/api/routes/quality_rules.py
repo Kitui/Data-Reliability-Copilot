@@ -4,23 +4,30 @@ import csv
 import io
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from sqlalchemy import delete, select, func
-from sqlalchemy.exc import IntegrityError
+from pydantic import BaseModel, Field
+from sqlalchemy import delete, func, select
 
 from app.api.auth_dependencies import require_roles, require_user
-from app.db.models import AuditRecord, DataContractRecord, DatasetRecord, DatasetRuleAssignmentRecord, QualityRuleRecord, RuleExecutionRecord, UploadRecord
-from app.db.session import get_session_factory
-from app.schemas import AuditResult, DataContract, RuleDefinition
-from pydantic import BaseModel, Field
 from app.contracts import generate_contract
 from app.core.config import get_settings
-from app.services.dataset_files import build_dataset_file_service
-from app.ingestion import read_csv_bytes, read_csv_path
-from app.versioning import lineage_audits
+from app.db.models import (
+    AuditRecord,
+    DataContractRecord,
+    DatasetRecord,
+    DatasetRuleAssignmentRecord,
+    QualityRuleRecord,
+    RuleExecutionRecord,
+    UploadRecord,
+)
+from app.db.session import get_session_factory
+from app.ingestion import read_csv_bytes
 from app.quality_rules import execute_quality_rules
+from app.schemas import AuditResult, RuleDefinition
+from app.services.dataset_files import build_dataset_file_service
+from app.versioning import lineage_audits
 
 router = APIRouter(prefix="/quality-rules", tags=["Quality Rules"])
 
@@ -45,13 +52,23 @@ class BulkAssignmentPayload(BaseModel):
 
 def _serialize_contract(row: DataContractRecord, dataset_name: str | None = None) -> dict:
     return {
-        "id": row.id, "contract_key": row.contract_key, "workspace_id": row.workspace_id,
-        "dataset_id": row.dataset_id, "dataset_name": dataset_name, "name": row.name,
-        "description": row.description, "status": row.status, "version": row.version,
-        "contract": json.loads(row.contract_json or "{}"), "source_audit_id": row.source_audit_id,
+        "id": row.id,
+        "contract_key": row.contract_key,
+        "workspace_id": row.workspace_id,
+        "dataset_id": row.dataset_id,
+        "dataset_name": dataset_name,
+        "name": row.name,
+        "description": row.description,
+        "status": row.status,
+        "version": row.version,
+        "contract": json.loads(row.contract_json or "{}"),
+        "source_audit_id": row.source_audit_id,
         "validation_status": row.validation_status,
-        "validation": json.loads(row.validation_json or "{}"), "validated_at": row.validated_at,
-        "published_at": row.published_at, "created_at": row.created_at, "updated_at": row.updated_at,
+        "validation": json.loads(row.validation_json or "{}"),
+        "validated_at": row.validated_at,
+        "published_at": row.published_at,
+        "created_at": row.created_at,
+        "updated_at": row.updated_at,
     }
 
 
@@ -77,10 +94,12 @@ def _serialize(row: QualityRuleRecord) -> dict:
 def assigned_rules_for_dataset(workspace_id: int, dataset_name: str) -> list[RuleDefinition]:
     Session = get_session_factory()
     with Session() as db:
-        dataset = db.scalar(select(DatasetRecord).where(
-            DatasetRecord.workspace_id == workspace_id,
-            DatasetRecord.name == dataset_name,
-        ))
+        dataset = db.scalar(
+            select(DatasetRecord).where(
+                DatasetRecord.workspace_id == workspace_id,
+                DatasetRecord.name == dataset_name,
+            )
+        )
         if dataset is None:
             return []
         rows = db.scalars(
@@ -104,15 +123,17 @@ def persist_rule_executions(audit_id: str, executions: list) -> None:
     with Session() as db:
         db.execute(delete(RuleExecutionRecord).where(RuleExecutionRecord.audit_id == audit_id))
         for execution in executions:
-            db.add(RuleExecutionRecord(
-                audit_id=audit_id,
-                rule_id=execution.rule_id,
-                outcome=execution.outcome,
-                affected_rows=execution.affected_rows,
-                affected_rate=execution.affected_rate,
-                message=execution.message,
-                executed_at=execution.executed_at,
-            ))
+            db.add(
+                RuleExecutionRecord(
+                    audit_id=audit_id,
+                    rule_id=execution.rule_id,
+                    outcome=execution.outcome,
+                    affected_rows=execution.affected_rows,
+                    affected_rate=execution.affected_rate,
+                    message=execution.message,
+                    executed_at=execution.executed_at,
+                )
+            )
         db.commit()
 
 
@@ -120,26 +141,39 @@ def persist_rule_executions(audit_id: str, executions: list) -> None:
 def list_rules(user: dict = Depends(require_user)):
     Session = get_session_factory()
     with Session() as db:
-        rows = db.scalars(select(QualityRuleRecord).where(
-            QualityRuleRecord.workspace_id == user["workspace"]["id"]
-        ).order_by(QualityRuleRecord.updated_at.desc())).all()
+        rows = db.scalars(
+            select(QualityRuleRecord)
+            .where(QualityRuleRecord.workspace_id == user["workspace"]["id"])
+            .order_by(QualityRuleRecord.updated_at.desc())
+        ).all()
         return [_serialize(row) for row in rows]
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_rule(payload: RuleDefinition, user: dict = Depends(require_roles("owner", "admin", "analyst"))):
     _validate_rule(payload)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     row = QualityRuleRecord(
-        workspace_id=user["workspace"]["id"], name=payload.name.strip(), description=payload.description,
-        rule_type=payload.rule_type, scope=payload.scope, column_name=payload.column_name,
-        category=payload.category, severity=payload.severity,
-        parameters_json=json.dumps(payload.parameters), recommendation=payload.recommendation,
-        is_active=1 if payload.is_active else 0, created_by_user_id=user["id"], created_at=now, updated_at=now,
+        workspace_id=user["workspace"]["id"],
+        name=payload.name.strip(),
+        description=payload.description,
+        rule_type=payload.rule_type,
+        scope=payload.scope,
+        column_name=payload.column_name,
+        category=payload.category,
+        severity=payload.severity,
+        parameters_json=json.dumps(payload.parameters),
+        recommendation=payload.recommendation,
+        is_active=1 if payload.is_active else 0,
+        created_by_user_id=user["id"],
+        created_at=now,
+        updated_at=now,
     )
     Session = get_session_factory()
     with Session() as db:
-        db.add(row); db.commit(); db.refresh(row)
+        db.add(row)
+        db.commit()
+        db.refresh(row)
         return _serialize(row)
 
 
@@ -148,15 +182,27 @@ def rules_dashboard(user: dict = Depends(require_user)):
     workspace_id = user["workspace"]["id"]
     Session = get_session_factory()
     with Session() as db:
-        rules = db.scalars(select(QualityRuleRecord).where(QualityRuleRecord.workspace_id == workspace_id).order_by(QualityRuleRecord.updated_at.desc())).all()
-        dataset_ids = db.scalars(select(DatasetRecord.id).where(DatasetRecord.workspace_id == workspace_id)).all()
-        assignments = db.execute(select(DatasetRuleAssignmentRecord.rule_id, DatasetRuleAssignmentRecord.dataset_id).join(QualityRuleRecord, QualityRuleRecord.id == DatasetRuleAssignmentRecord.rule_id).where(QualityRuleRecord.workspace_id == workspace_id, DatasetRuleAssignmentRecord.is_active == 1)).all()
-        executions = db.execute(select(RuleExecutionRecord, QualityRuleRecord.name).join(QualityRuleRecord, QualityRuleRecord.id == RuleExecutionRecord.rule_id).where(QualityRuleRecord.workspace_id == workspace_id).order_by(RuleExecutionRecord.executed_at.desc())).all()
+        rules = db.scalars(
+            select(QualityRuleRecord)
+            .where(QualityRuleRecord.workspace_id == workspace_id)
+            .order_by(QualityRuleRecord.updated_at.desc())
+        ).all()
+        assignments = db.execute(
+            select(DatasetRuleAssignmentRecord.rule_id, DatasetRuleAssignmentRecord.dataset_id)
+            .join(QualityRuleRecord, QualityRuleRecord.id == DatasetRuleAssignmentRecord.rule_id)
+            .where(QualityRuleRecord.workspace_id == workspace_id, DatasetRuleAssignmentRecord.is_active == 1)
+        ).all()
+        executions = db.execute(
+            select(RuleExecutionRecord, QualityRuleRecord.name)
+            .join(QualityRuleRecord, QualityRuleRecord.id == RuleExecutionRecord.rule_id)
+            .where(QualityRuleRecord.workspace_id == workspace_id)
+            .order_by(RuleExecutionRecord.executed_at.desc())
+        ).all()
         assignment_counts = {}
-        for rule_id, dataset_id in assignments:
+        for rule_id, _dataset_id in assignments:
             assignment_counts[rule_id] = assignment_counts.get(rule_id, 0) + 1
         last_exec = {}
-        for execution, name in executions:
+        for execution, _name in executions:
             last_exec.setdefault(execution.rule_id, execution.executed_at)
         rule_items = []
         for row in rules:
@@ -171,17 +217,32 @@ def rules_dashboard(user: dict = Depends(require_user)):
                 "total_rules": len(rules),
                 "active_rules": sum(1 for row in rules if row.is_active),
                 "assigned_datasets": len(set(dataset_id for _, dataset_id in assignments)),
-                "contracted_datasets": len(set(db.scalars(select(DataContractRecord.dataset_id).where(DataContractRecord.workspace_id == workspace_id, DataContractRecord.status != "archived")).all())),
+                "contracted_datasets": len(
+                    set(
+                        db.scalars(
+                            select(DataContractRecord.dataset_id).where(
+                                DataContractRecord.workspace_id == workspace_id, DataContractRecord.status != "archived"
+                            )
+                        ).all()
+                    )
+                ),
                 "executions": len(executions),
                 "failing": failures,
                 "failure_rate": round((failures / len(executions) * 100), 1) if executions else 0,
             },
-            "recent_executions": [{
-                "rule_id": execution.rule_id, "rule_name": name, "audit_id": execution.audit_id,
-                "outcome": execution.outcome, "affected_rows": execution.affected_rows,
-                "affected_rate": execution.affected_rate, "message": execution.message,
-                "executed_at": execution.executed_at,
-            } for execution, name in executions[:30]],
+            "recent_executions": [
+                {
+                    "rule_id": execution.rule_id,
+                    "rule_name": name,
+                    "audit_id": execution.audit_id,
+                    "outcome": execution.outcome,
+                    "affected_rows": execution.affected_rows,
+                    "affected_rate": execution.affected_rate,
+                    "message": execution.message,
+                    "executed_at": execution.executed_at,
+                }
+                for execution, name in executions[:30]
+            ],
             "assignments": [{"rule_id": rule_id, "dataset_id": dataset_id} for rule_id, dataset_id in assignments],
         }
 
@@ -206,57 +267,93 @@ def list_contracts(user: dict = Depends(require_user)):
 @router.post("/contracts", status_code=201)
 def create_contract(payload: ContractPayload, user: dict = Depends(require_roles("owner", "admin", "analyst"))):
     wid = user["workspace"]["id"]
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     Session = get_session_factory()
     with Session() as db:
-        dataset = db.scalar(select(DatasetRecord).where(DatasetRecord.id == payload.dataset_id, DatasetRecord.workspace_id == wid))
+        dataset = db.scalar(
+            select(DatasetRecord).where(DatasetRecord.id == payload.dataset_id, DatasetRecord.workspace_id == wid)
+        )
         if dataset is None:
             raise HTTPException(404, "Dataset not found.")
-        existing = db.scalar(select(DataContractRecord).where(
-            DataContractRecord.workspace_id == wid,
-            DataContractRecord.dataset_id == dataset.id,
-        ).order_by(DataContractRecord.version.desc(), DataContractRecord.id.desc()))
-        row = DataContractRecord(
-            contract_key=existing.contract_key if existing else uuid.uuid4().hex, workspace_id=wid, dataset_id=dataset.id,
-            name=payload.name.strip(), description=payload.description, status=payload.status,
-            version=(existing.version + 1) if existing else 1, contract_json=json.dumps(payload.contract), source_audit_id=dataset.latest_audit_id,
-            validation_status="not_validated", validation_json="{}",
-            published_at=now if payload.status == "published" else None,
-            created_by_user_id=user["id"], created_at=now, updated_at=now,
+        existing = db.scalar(
+            select(DataContractRecord)
+            .where(
+                DataContractRecord.workspace_id == wid,
+                DataContractRecord.dataset_id == dataset.id,
+            )
+            .order_by(DataContractRecord.version.desc(), DataContractRecord.id.desc())
         )
-        db.add(row); db.commit(); db.refresh(row)
+        row = DataContractRecord(
+            contract_key=existing.contract_key if existing else uuid.uuid4().hex,
+            workspace_id=wid,
+            dataset_id=dataset.id,
+            name=payload.name.strip(),
+            description=payload.description,
+            status=payload.status,
+            version=(existing.version + 1) if existing else 1,
+            contract_json=json.dumps(payload.contract),
+            source_audit_id=dataset.latest_audit_id,
+            validation_status="not_validated",
+            validation_json="{}",
+            published_at=now if payload.status == "published" else None,
+            created_by_user_id=user["id"],
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(row)
+        db.commit()
+        db.refresh(row)
         return _serialize_contract(row, dataset.name)
 
 
 @router.post("/contracts/generate/{dataset_id}", status_code=201)
 def generate_dataset_contract(dataset_id: int, user: dict = Depends(require_roles("owner", "admin", "analyst"))):
     wid = user["workspace"]["id"]
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     Session = get_session_factory()
     with Session() as db:
-        dataset = db.scalar(select(DatasetRecord).where(DatasetRecord.id == dataset_id, DatasetRecord.workspace_id == wid))
+        dataset = db.scalar(
+            select(DatasetRecord).where(DatasetRecord.id == dataset_id, DatasetRecord.workspace_id == wid)
+        )
         if dataset is None:
             raise HTTPException(404, "Dataset not found.")
         if not dataset.latest_audit_id:
             raise HTTPException(409, "Run an audit before generating a contract.")
-        audit_row = db.scalar(select(AuditRecord).where(AuditRecord.audit_id == dataset.latest_audit_id, AuditRecord.workspace_id == wid))
+        audit_row = db.scalar(
+            select(AuditRecord).where(AuditRecord.audit_id == dataset.latest_audit_id, AuditRecord.workspace_id == wid)
+        )
         if audit_row is None:
             raise HTTPException(404, "Latest audit not found.")
         audit = AuditResult.model_validate(json.loads(audit_row.payload_json))
         assigned_rules = assigned_rules_for_dataset(wid, dataset.name)
         contract = generate_contract(audit, assigned_rules).model_dump(mode="json")
-        existing = db.scalar(select(DataContractRecord).where(
-            DataContractRecord.workspace_id == wid,
-            DataContractRecord.dataset_id == dataset.id,
-        ).order_by(DataContractRecord.version.desc(), DataContractRecord.id.desc()))
-        row = DataContractRecord(
-            contract_key=existing.contract_key if existing else uuid.uuid4().hex, workspace_id=wid, dataset_id=dataset.id,
-            name=f"{dataset.name} reliability contract", description="Generated from the latest completed audit.",
-            status="draft", version=(existing.version + 1) if existing else 1, contract_json=json.dumps(contract), source_audit_id=dataset.latest_audit_id,
-            validation_status="not_validated", validation_json="{}", created_by_user_id=user["id"],
-            created_at=now, updated_at=now,
+        existing = db.scalar(
+            select(DataContractRecord)
+            .where(
+                DataContractRecord.workspace_id == wid,
+                DataContractRecord.dataset_id == dataset.id,
+            )
+            .order_by(DataContractRecord.version.desc(), DataContractRecord.id.desc())
         )
-        db.add(row); db.commit(); db.refresh(row)
+        row = DataContractRecord(
+            contract_key=existing.contract_key if existing else uuid.uuid4().hex,
+            workspace_id=wid,
+            dataset_id=dataset.id,
+            name=f"{dataset.name} reliability contract",
+            description="Generated from the latest completed audit.",
+            status="draft",
+            version=(existing.version + 1) if existing else 1,
+            contract_json=json.dumps(contract),
+            source_audit_id=dataset.latest_audit_id,
+            validation_status="not_validated",
+            validation_json="{}",
+            created_by_user_id=user["id"],
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(row)
+        db.commit()
+        db.refresh(row)
         return _serialize_contract(row, dataset.name)
 
 
@@ -265,31 +362,54 @@ def get_contract_record(contract_id: int, user: dict = Depends(require_user)):
     wid = user["workspace"]["id"]
     Session = get_session_factory()
     with Session() as db:
-        result = db.execute(select(DataContractRecord, DatasetRecord.name).join(DatasetRecord).where(DataContractRecord.id == contract_id, DataContractRecord.workspace_id == wid)).first()
+        result = db.execute(
+            select(DataContractRecord, DatasetRecord.name)
+            .join(DatasetRecord)
+            .where(DataContractRecord.id == contract_id, DataContractRecord.workspace_id == wid)
+        ).first()
         if result is None:
             raise HTTPException(404, "Data contract not found.")
         return _serialize_contract(result[0], result[1])
 
 
 @router.patch("/contracts/{contract_id}", status_code=201)
-def update_contract_record(contract_id: int, payload: ContractPayload, user: dict = Depends(require_roles("owner", "admin", "analyst"))):
+def update_contract_record(
+    contract_id: int, payload: ContractPayload, user: dict = Depends(require_roles("owner", "admin", "analyst"))
+):
     wid = user["workspace"]["id"]
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     Session = get_session_factory()
     with Session() as db:
-        current = db.scalar(select(DataContractRecord).where(DataContractRecord.id == contract_id, DataContractRecord.workspace_id == wid))
-        dataset = db.scalar(select(DatasetRecord).where(DatasetRecord.id == payload.dataset_id, DatasetRecord.workspace_id == wid))
+        current = db.scalar(
+            select(DataContractRecord).where(
+                DataContractRecord.id == contract_id, DataContractRecord.workspace_id == wid
+            )
+        )
+        dataset = db.scalar(
+            select(DatasetRecord).where(DatasetRecord.id == payload.dataset_id, DatasetRecord.workspace_id == wid)
+        )
         if current is None or dataset is None:
             raise HTTPException(404, "Data contract or dataset not found.")
         row = DataContractRecord(
-            contract_key=current.contract_key, workspace_id=wid, dataset_id=dataset.id,
-            name=payload.name.strip(), description=payload.description, status=payload.status,
-            version=current.version + 1, contract_json=json.dumps(payload.contract), source_audit_id=dataset.latest_audit_id,
-            validation_status="not_validated", validation_json="{}",
+            contract_key=current.contract_key,
+            workspace_id=wid,
+            dataset_id=dataset.id,
+            name=payload.name.strip(),
+            description=payload.description,
+            status=payload.status,
+            version=current.version + 1,
+            contract_json=json.dumps(payload.contract),
+            source_audit_id=dataset.latest_audit_id,
+            validation_status="not_validated",
+            validation_json="{}",
             published_at=now if payload.status == "published" else None,
-            created_by_user_id=user["id"], created_at=now, updated_at=now,
+            created_by_user_id=user["id"],
+            created_at=now,
+            updated_at=now,
         )
-        db.add(row); db.commit(); db.refresh(row)
+        db.add(row)
+        db.commit()
+        db.refresh(row)
         return _serialize_contract(row, dataset.name)
 
 
@@ -298,14 +418,25 @@ def contract_versions(contract_id: int, user: dict = Depends(require_user)):
     wid = user["workspace"]["id"]
     Session = get_session_factory()
     with Session() as db:
-        current = db.scalar(select(DataContractRecord).where(DataContractRecord.id == contract_id, DataContractRecord.workspace_id == wid))
+        current = db.scalar(
+            select(DataContractRecord).where(
+                DataContractRecord.id == contract_id, DataContractRecord.workspace_id == wid
+            )
+        )
         if current is None:
             raise HTTPException(404, "Data contract not found.")
-        rows = db.execute(select(DataContractRecord, DatasetRecord.name).join(DatasetRecord).where(DataContractRecord.workspace_id == wid, DataContractRecord.contract_key == current.contract_key).order_by(DataContractRecord.version.desc())).all()
+        rows = db.execute(
+            select(DataContractRecord, DatasetRecord.name)
+            .join(DatasetRecord)
+            .where(DataContractRecord.workspace_id == wid, DataContractRecord.contract_key == current.contract_key)
+            .order_by(DataContractRecord.version.desc())
+        ).all()
         return [_serialize_contract(row, dataset_name) for row, dataset_name in rows]
 
 
-def _latest_audit_for_latest_dataset_version(db, workspace_id: int, dataset_name: str) -> tuple[AuditRecord, AuditResult] | None:
+def _latest_audit_for_latest_dataset_version(
+    db, workspace_id: int, dataset_name: str
+) -> tuple[AuditRecord, AuditResult] | None:
     rows = db.scalars(
         select(AuditRecord)
         .where(AuditRecord.workspace_id == workspace_id, AuditRecord.dataset_name == dataset_name)
@@ -331,19 +462,29 @@ def _schema_contract_violations(contract: dict, audit: AuditResult) -> list[dict
     violations: list[dict] = []
     for column in contract.get("required_columns", []):
         if column not in columns:
-            violations.append({
-                "kind": "required_column", "column": column, "expected": "column present",
-                "observed": "missing", "affected_rows": audit.profile.row_count,
-                "message": f"Required column '{column}' is missing.",
-            })
+            violations.append(
+                {
+                    "kind": "required_column",
+                    "column": column,
+                    "expected": "column present",
+                    "observed": "missing",
+                    "affected_rows": audit.profile.row_count,
+                    "message": f"Required column '{column}' is missing.",
+                }
+            )
     for column, expected in contract.get("expected_types", {}).items():
         actual = columns.get(column)
         if actual is not None and actual != expected:
-            violations.append({
-                "kind": "expected_type", "column": column, "expected": expected,
-                "observed": actual, "affected_rows": audit.profile.row_count,
-                "message": f"Column '{column}' is {actual}; expected {expected}.",
-            })
+            violations.append(
+                {
+                    "kind": "expected_type",
+                    "column": column,
+                    "expected": expected,
+                    "observed": actual,
+                    "affected_rows": audit.profile.row_count,
+                    "message": f"Column '{column}' is {actual}; expected {expected}.",
+                }
+            )
     return violations
 
 
@@ -357,12 +498,18 @@ def _rule_contract_violations(contract: dict, audit: AuditResult) -> list[dict]:
         source = source_by_id[rule_id]
         execution = executions.get(rule_id)
         if execution is None:
-            violations.append({
-                "kind": "rule_not_executed", "rule_id": rule_id, "rule_name": source.get("name"),
-                "column": source.get("column"), "expected": source.get("rule_type"),
-                "observed": "not executed", "affected_rows": 0,
-                "message": f"Assigned rule '{source.get('name')}' was not executed for this audit.",
-            })
+            violations.append(
+                {
+                    "kind": "rule_not_executed",
+                    "rule_id": rule_id,
+                    "rule_name": source.get("name"),
+                    "column": source.get("column"),
+                    "expected": source.get("rule_type"),
+                    "observed": "not executed",
+                    "affected_rows": 0,
+                    "message": f"Assigned rule '{source.get('name')}' was not executed for this audit.",
+                }
+            )
             continue
         if execution.outcome in {"failed", "warning"}:
             column = source.get("column")
@@ -386,26 +533,39 @@ def _rule_contract_violations(contract: dict, audit: AuditResult) -> list[dict]:
             elif rule_type == "unique":
                 expected = "unique values"
             observed = f"{execution.affected_rows} affected row(s)"
-            violations.append({
-                "kind": "assigned_rule", "rule_id": rule_id, "rule_name": execution.rule_name,
-                "rule_type": rule_type, "column": column,
-                "expected": expected, "observed": observed,
-                "affected_rows": execution.affected_rows, "affected_rate": execution.affected_rate,
-                "message": execution.message,
-            })
+            violations.append(
+                {
+                    "kind": "assigned_rule",
+                    "rule_id": rule_id,
+                    "rule_name": execution.rule_name,
+                    "rule_type": rule_type,
+                    "column": column,
+                    "expected": expected,
+                    "observed": observed,
+                    "affected_rows": execution.affected_rows,
+                    "affected_rate": execution.affected_rate,
+                    "message": execution.message,
+                }
+            )
     return violations
 
 
 @router.post("/contracts/{contract_id}/validate")
 def validate_contract_record(contract_id: int, user: dict = Depends(require_user)):
     wid = user["workspace"]["id"]
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     Session = get_session_factory()
     with Session() as db:
-        row = db.scalar(select(DataContractRecord).where(DataContractRecord.id == contract_id, DataContractRecord.workspace_id == wid))
+        row = db.scalar(
+            select(DataContractRecord).where(
+                DataContractRecord.id == contract_id, DataContractRecord.workspace_id == wid
+            )
+        )
         if row is None:
             raise HTTPException(404, "Data contract not found.")
-        dataset = db.scalar(select(DatasetRecord).where(DatasetRecord.id == row.dataset_id, DatasetRecord.workspace_id == wid))
+        dataset = db.scalar(
+            select(DatasetRecord).where(DatasetRecord.id == row.dataset_id, DatasetRecord.workspace_id == wid)
+        )
         if dataset is None:
             raise HTTPException(404, "Dataset not found.")
         latest = _latest_audit_for_latest_dataset_version(db, wid, dataset.name)
@@ -422,7 +582,9 @@ def validate_contract_record(contract_id: int, user: dict = Depends(require_user
                 .order_by(AuditRecord.created_at)
             ).all()
             lineage = lineage_audits(dataset_audits)
-            dataset_version = next((index for index, item in enumerate(lineage, 1) if item.audit_id == audit_row.audit_id), None)
+            dataset_version = next(
+                (index for index, item in enumerate(lineage, 1) if item.audit_id == audit_row.audit_id), None
+            )
             if dataset_version is None:
                 dataset_version = len(lineage) or 1
         result = {
@@ -447,24 +609,44 @@ def validate_contract_record(contract_id: int, user: dict = Depends(require_user
 
 
 @router.post("/contracts/{contract_id}/status", status_code=201)
-def transition_contract_status(contract_id: int, payload: ContractStatusPayload, user: dict = Depends(require_roles("owner", "admin", "analyst"))):
+def transition_contract_status(
+    contract_id: int, payload: ContractStatusPayload, user: dict = Depends(require_roles("owner", "admin", "analyst"))
+):
     wid = user["workspace"]["id"]
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     Session = get_session_factory()
     with Session() as db:
-        current = db.scalar(select(DataContractRecord).where(DataContractRecord.id == contract_id, DataContractRecord.workspace_id == wid))
+        current = db.scalar(
+            select(DataContractRecord).where(
+                DataContractRecord.id == contract_id, DataContractRecord.workspace_id == wid
+            )
+        )
         if current is None:
             raise HTTPException(404, "Data contract not found.")
-        dataset = db.scalar(select(DatasetRecord).where(DatasetRecord.id == current.dataset_id, DatasetRecord.workspace_id == wid))
-        row = DataContractRecord(
-            contract_key=current.contract_key, workspace_id=wid, dataset_id=current.dataset_id,
-            name=current.name, description=current.description, status=payload.status,
-            version=current.version + 1, contract_json=current.contract_json, source_audit_id=current.source_audit_id,
-            validation_status=current.validation_status, validation_json=current.validation_json,
-            validated_at=current.validated_at, published_at=now if payload.status == "published" else current.published_at,
-            created_by_user_id=user["id"], created_at=now, updated_at=now,
+        dataset = db.scalar(
+            select(DatasetRecord).where(DatasetRecord.id == current.dataset_id, DatasetRecord.workspace_id == wid)
         )
-        db.add(row); db.commit(); db.refresh(row)
+        row = DataContractRecord(
+            contract_key=current.contract_key,
+            workspace_id=wid,
+            dataset_id=current.dataset_id,
+            name=current.name,
+            description=current.description,
+            status=payload.status,
+            version=current.version + 1,
+            contract_json=current.contract_json,
+            source_audit_id=current.source_audit_id,
+            validation_status=current.validation_status,
+            validation_json=current.validation_json,
+            validated_at=current.validated_at,
+            published_at=now if payload.status == "published" else current.published_at,
+            created_by_user_id=user["id"],
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(row)
+        db.commit()
+        db.refresh(row)
         return _serialize_contract(row, dataset.name if dataset else None)
 
 
@@ -474,54 +656,122 @@ def bulk_assignments(payload: BulkAssignmentPayload, user: dict = Depends(requir
     Session = get_session_factory()
     changed = 0
     with Session() as db:
-        rules = db.scalars(select(QualityRuleRecord).where(QualityRuleRecord.workspace_id == wid, QualityRuleRecord.id.in_(payload.rule_ids))).all()
-        datasets = db.scalars(select(DatasetRecord).where(DatasetRecord.workspace_id == wid, DatasetRecord.id.in_(payload.dataset_ids))).all()
+        rules = db.scalars(
+            select(QualityRuleRecord).where(
+                QualityRuleRecord.workspace_id == wid, QualityRuleRecord.id.in_(payload.rule_ids)
+            )
+        ).all()
+        datasets = db.scalars(
+            select(DatasetRecord).where(DatasetRecord.workspace_id == wid, DatasetRecord.id.in_(payload.dataset_ids))
+        ).all()
         if len(rules) != len(set(payload.rule_ids)) or len(datasets) != len(set(payload.dataset_ids)):
             raise HTTPException(404, "One or more rules or datasets were not found.")
         for rule_id in payload.rule_ids:
             for dataset_id in payload.dataset_ids:
-                existing = db.scalar(select(DatasetRuleAssignmentRecord).where(DatasetRuleAssignmentRecord.rule_id == rule_id, DatasetRuleAssignmentRecord.dataset_id == dataset_id))
+                existing = db.scalar(
+                    select(DatasetRuleAssignmentRecord).where(
+                        DatasetRuleAssignmentRecord.rule_id == rule_id,
+                        DatasetRuleAssignmentRecord.dataset_id == dataset_id,
+                    )
+                )
                 desired = 1 if payload.action == "assign" else 0
                 if existing:
                     if existing.is_active != desired:
-                        existing.is_active = desired; changed += 1
+                        existing.is_active = desired
+                        changed += 1
                 elif desired:
-                    db.add(DatasetRuleAssignmentRecord(rule_id=rule_id, dataset_id=dataset_id, is_active=1, created_at=datetime.now(timezone.utc))); changed += 1
+                    db.add(
+                        DatasetRuleAssignmentRecord(
+                            rule_id=rule_id, dataset_id=dataset_id, is_active=1, created_at=datetime.now(UTC)
+                        )
+                    )
+                    changed += 1
         db.commit()
     return {"changed": changed, "action": payload.action}
 
 
 @router.get("/executions")
 def execution_history(
-    outcome: str = Query(default="all"), rule_id: int | None = None, dataset_id: int | None = None,
-    search: str = Query(default=""), page: int = Query(default=1, ge=1), page_size: int = Query(default=25, ge=1, le=200),
+    outcome: str = Query(default="all"),
+    rule_id: int | None = None,
+    dataset_id: int | None = None,
+    search: str = Query(default=""),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=25, ge=1, le=200),
     user: dict = Depends(require_user),
 ):
     wid = user["workspace"]["id"]
     Session = get_session_factory()
     with Session() as db:
-        stmt = select(RuleExecutionRecord, QualityRuleRecord.name, AuditRecord.dataset_name).join(QualityRuleRecord, QualityRuleRecord.id == RuleExecutionRecord.rule_id).join(AuditRecord, AuditRecord.audit_id == RuleExecutionRecord.audit_id).where(QualityRuleRecord.workspace_id == wid, AuditRecord.workspace_id == wid)
-        if outcome != "all": stmt = stmt.where(RuleExecutionRecord.outcome == outcome)
-        if rule_id: stmt = stmt.where(QualityRuleRecord.id == rule_id)
+        stmt = (
+            select(RuleExecutionRecord, QualityRuleRecord.name, AuditRecord.dataset_name)
+            .join(QualityRuleRecord, QualityRuleRecord.id == RuleExecutionRecord.rule_id)
+            .join(AuditRecord, AuditRecord.audit_id == RuleExecutionRecord.audit_id)
+            .where(QualityRuleRecord.workspace_id == wid, AuditRecord.workspace_id == wid)
+        )
+        if outcome != "all":
+            stmt = stmt.where(RuleExecutionRecord.outcome == outcome)
+        if rule_id:
+            stmt = stmt.where(QualityRuleRecord.id == rule_id)
         if dataset_id:
-            dataset = db.scalar(select(DatasetRecord).where(DatasetRecord.id == dataset_id, DatasetRecord.workspace_id == wid))
-            if dataset is None: raise HTTPException(404, "Dataset not found.")
+            dataset = db.scalar(
+                select(DatasetRecord).where(DatasetRecord.id == dataset_id, DatasetRecord.workspace_id == wid)
+            )
+            if dataset is None:
+                raise HTTPException(404, "Dataset not found.")
             stmt = stmt.where(AuditRecord.dataset_name == dataset.name)
-        if search.strip(): stmt = stmt.where(func.lower(QualityRuleRecord.name).contains(search.strip().lower()))
+        if search.strip():
+            stmt = stmt.where(func.lower(QualityRuleRecord.name).contains(search.strip().lower()))
         rows = db.execute(stmt.order_by(RuleExecutionRecord.executed_at.desc())).all()
-        total = len(rows); start = (page - 1) * page_size
-        items = rows[start:start + page_size]
-        return {"total": total, "page": page, "page_size": page_size, "items": [{"id": execution.id, "rule_id": execution.rule_id, "rule_name": rule_name, "dataset_name": dataset_name, "audit_id": execution.audit_id, "outcome": execution.outcome, "affected_rows": execution.affected_rows, "affected_rate": execution.affected_rate, "affected_percentage": round(execution.affected_rate * 100, 2), "message": execution.message, "executed_at": execution.executed_at} for execution, rule_name, dataset_name in items]}
+        total = len(rows)
+        start = (page - 1) * page_size
+        items = rows[start : start + page_size]
+        return {
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "items": [
+                {
+                    "id": execution.id,
+                    "rule_id": execution.rule_id,
+                    "rule_name": rule_name,
+                    "dataset_name": dataset_name,
+                    "audit_id": execution.audit_id,
+                    "outcome": execution.outcome,
+                    "affected_rows": execution.affected_rows,
+                    "affected_rate": execution.affected_rate,
+                    "affected_percentage": round(execution.affected_rate * 100, 2),
+                    "message": execution.message,
+                    "executed_at": execution.executed_at,
+                }
+                for execution, rule_name, dataset_name in items
+            ],
+        }
 
 
 @router.get("/executions/export.csv")
 def export_execution_history(user: dict = Depends(require_user)):
     data = execution_history(outcome="all", rule_id=None, dataset_id=None, search="", page=1, page_size=200, user=user)
-    output = io.StringIO(); writer = csv.writer(output)
+    output = io.StringIO()
+    writer = csv.writer(output)
     writer.writerow(["Rule", "Dataset", "Outcome", "Affected rows", "Affected percentage", "Executed", "Audit"])
     for item in data["items"]:
-        writer.writerow([item["rule_name"], item["dataset_name"], item["outcome"], item["affected_rows"], item["affected_percentage"], item["executed_at"], item["audit_id"]])
-    return Response(output.getvalue(), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=rule_execution_history.csv"})
+        writer.writerow(
+            [
+                item["rule_name"],
+                item["dataset_name"],
+                item["outcome"],
+                item["affected_rows"],
+                item["affected_percentage"],
+                item["executed_at"],
+                item["audit_id"],
+            ]
+        )
+    return Response(
+        output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=rule_execution_history.csv"},
+    )
 
 
 class RuleBuilderTestPayload(BaseModel):
@@ -535,31 +785,47 @@ def rule_builder_context(dataset_id: int, user: dict = Depends(require_user)):
     wid = user["workspace"]["id"]
     Session = get_session_factory()
     with Session() as db:
-        dataset = db.scalar(select(DatasetRecord).where(DatasetRecord.id == dataset_id, DatasetRecord.workspace_id == wid))
+        dataset = db.scalar(
+            select(DatasetRecord).where(DatasetRecord.id == dataset_id, DatasetRecord.workspace_id == wid)
+        )
         if dataset is None:
             raise HTTPException(404, "Dataset not found.")
         columns = []
         if dataset.latest_audit_id:
-            audit = db.scalar(select(AuditRecord).where(AuditRecord.audit_id == dataset.latest_audit_id, AuditRecord.workspace_id == wid))
+            audit = db.scalar(
+                select(AuditRecord).where(
+                    AuditRecord.audit_id == dataset.latest_audit_id, AuditRecord.workspace_id == wid
+                )
+            )
             if audit:
                 payload = json.loads(audit.payload_json)
-                columns = [{
-                    "name": col.get("name"),
-                    "inferred_type": col.get("inferred_type", "text"),
-                    "missing_rate": col.get("missing_rate", 0),
-                    "unique_rate": col.get("unique_rate", 0),
-                } for col in payload.get("profile", {}).get("columns", [])]
-        return {"dataset": {"id": dataset.id, "name": dataset.name, "record_count": dataset.record_count}, "columns": columns}
+                columns = [
+                    {
+                        "name": col.get("name"),
+                        "inferred_type": col.get("inferred_type", "text"),
+                        "missing_rate": col.get("missing_rate", 0),
+                        "unique_rate": col.get("unique_rate", 0),
+                    }
+                    for col in payload.get("profile", {}).get("columns", [])
+                ]
+        return {
+            "dataset": {"id": dataset.id, "name": dataset.name, "record_count": dataset.record_count},
+            "columns": columns,
+        }
 
 
 @router.post("/builder/test")
-def test_rule_builder(payload: RuleBuilderTestPayload, user: dict = Depends(require_roles("owner", "admin", "analyst"))):
+def test_rule_builder(
+    payload: RuleBuilderTestPayload, user: dict = Depends(require_roles("owner", "admin", "analyst"))
+):
     """Execute an unsaved rule against a dataset and return a safe impact preview."""
     _validate_rule(payload.rule)
     wid = user["workspace"]["id"]
     Session = get_session_factory()
     with Session() as db:
-        dataset = db.scalar(select(DatasetRecord).where(DatasetRecord.id == payload.dataset_id, DatasetRecord.workspace_id == wid))
+        dataset = db.scalar(
+            select(DatasetRecord).where(DatasetRecord.id == payload.dataset_id, DatasetRecord.workspace_id == wid)
+        )
         if dataset is None:
             raise HTTPException(404, "Dataset not found.")
         if not dataset.latest_audit_id:
@@ -588,7 +854,15 @@ def test_rule_builder(payload: RuleBuilderTestPayload, user: dict = Depends(requ
         "total_rows": len(frame),
         "message": execution.message,
         "examples": issue.examples[:5] if issue else [],
-        "estimated_score_impact": min(25, round(execution.affected_rate * 100 * {"critical": 1.0, "high": .75, "medium": .45, "low": .2}.get(payload.rule.severity, .45), 1)),
+        "estimated_score_impact": min(
+            25,
+            round(
+                execution.affected_rate
+                * 100
+                * {"critical": 1.0, "high": 0.75, "medium": 0.45, "low": 0.2}.get(payload.rule.severity, 0.45),
+                1,
+            ),
+        ),
     }
 
 
@@ -598,21 +872,36 @@ def get_rule(rule_id: int, user: dict = Depends(require_user)):
 
 
 @router.patch("/{rule_id}")
-def update_rule(rule_id: int, payload: RuleDefinition, user: dict = Depends(require_roles("owner", "admin", "analyst"))):
+def update_rule(
+    rule_id: int, payload: RuleDefinition, user: dict = Depends(require_roles("owner", "admin", "analyst"))
+):
     _validate_rule(payload)
     Session = get_session_factory()
     with Session() as db:
-        row = db.scalar(select(QualityRuleRecord).where(
-            QualityRuleRecord.id == rule_id,
-            QualityRuleRecord.workspace_id == user["workspace"]["id"],
-        ))
-        if row is None: raise HTTPException(404, "Quality rule not found.")
-        for field in ("name", "description", "rule_type", "scope", "column_name", "category", "severity", "recommendation"):
+        row = db.scalar(
+            select(QualityRuleRecord).where(
+                QualityRuleRecord.id == rule_id,
+                QualityRuleRecord.workspace_id == user["workspace"]["id"],
+            )
+        )
+        if row is None:
+            raise HTTPException(404, "Quality rule not found.")
+        for field in (
+            "name",
+            "description",
+            "rule_type",
+            "scope",
+            "column_name",
+            "category",
+            "severity",
+            "recommendation",
+        ):
             setattr(row, field, getattr(payload, field))
         row.parameters_json = json.dumps(payload.parameters)
         row.is_active = 1 if payload.is_active else 0
-        row.updated_at = datetime.now(timezone.utc)
-        db.commit(); db.refresh(row)
+        row.updated_at = datetime.now(UTC)
+        db.commit()
+        db.refresh(row)
         return _serialize(row)
 
 
@@ -620,12 +909,16 @@ def update_rule(rule_id: int, payload: RuleDefinition, user: dict = Depends(requ
 def delete_rule(rule_id: int, user: dict = Depends(require_roles("owner", "admin"))):
     Session = get_session_factory()
     with Session() as db:
-        row = db.scalar(select(QualityRuleRecord).where(
-            QualityRuleRecord.id == rule_id,
-            QualityRuleRecord.workspace_id == user["workspace"]["id"],
-        ))
-        if row is None: raise HTTPException(404, "Quality rule not found.")
-        db.delete(row); db.commit()
+        row = db.scalar(
+            select(QualityRuleRecord).where(
+                QualityRuleRecord.id == rule_id,
+                QualityRuleRecord.workspace_id == user["workspace"]["id"],
+            )
+        )
+        if row is None:
+            raise HTTPException(404, "Quality rule not found.")
+        db.delete(row)
+        db.commit()
 
 
 @router.post("/{rule_id}/assign/{dataset_id}", status_code=201)
@@ -633,17 +926,30 @@ def assign_rule(rule_id: int, dataset_id: int, user: dict = Depends(require_role
     workspace_id = user["workspace"]["id"]
     Session = get_session_factory()
     with Session() as db:
-        rule = db.scalar(select(QualityRuleRecord).where(QualityRuleRecord.id == rule_id, QualityRuleRecord.workspace_id == workspace_id))
-        dataset = db.scalar(select(DatasetRecord).where(DatasetRecord.id == dataset_id, DatasetRecord.workspace_id == workspace_id))
-        if rule is None or dataset is None: raise HTTPException(404, "Rule or dataset not found.")
-        existing = db.scalar(select(DatasetRuleAssignmentRecord).where(
-            DatasetRuleAssignmentRecord.rule_id == rule_id,
-            DatasetRuleAssignmentRecord.dataset_id == dataset_id,
-        ))
+        rule = db.scalar(
+            select(QualityRuleRecord).where(
+                QualityRuleRecord.id == rule_id, QualityRuleRecord.workspace_id == workspace_id
+            )
+        )
+        dataset = db.scalar(
+            select(DatasetRecord).where(DatasetRecord.id == dataset_id, DatasetRecord.workspace_id == workspace_id)
+        )
+        if rule is None or dataset is None:
+            raise HTTPException(404, "Rule or dataset not found.")
+        existing = db.scalar(
+            select(DatasetRuleAssignmentRecord).where(
+                DatasetRuleAssignmentRecord.rule_id == rule_id,
+                DatasetRuleAssignmentRecord.dataset_id == dataset_id,
+            )
+        )
         if existing:
             existing.is_active = 1
         else:
-            db.add(DatasetRuleAssignmentRecord(rule_id=rule_id, dataset_id=dataset_id, is_active=1, created_at=datetime.now(timezone.utc)))
+            db.add(
+                DatasetRuleAssignmentRecord(
+                    rule_id=rule_id, dataset_id=dataset_id, is_active=1, created_at=datetime.now(UTC)
+                )
+            )
         db.commit()
         return {"rule_id": rule_id, "dataset_id": dataset_id, "assigned": True}
 
@@ -653,13 +959,23 @@ def unassign_rule(rule_id: int, dataset_id: int, user: dict = Depends(require_ro
     workspace_id = user["workspace"]["id"]
     Session = get_session_factory()
     with Session() as db:
-        dataset = db.scalar(select(DatasetRecord).where(DatasetRecord.id == dataset_id, DatasetRecord.workspace_id == workspace_id))
-        rule = db.scalar(select(QualityRuleRecord).where(QualityRuleRecord.id == rule_id, QualityRuleRecord.workspace_id == workspace_id))
-        if dataset is None or rule is None: raise HTTPException(404, "Rule or dataset not found.")
-        db.execute(delete(DatasetRuleAssignmentRecord).where(
-            DatasetRuleAssignmentRecord.rule_id == rule_id,
-            DatasetRuleAssignmentRecord.dataset_id == dataset_id,
-        )); db.commit()
+        dataset = db.scalar(
+            select(DatasetRecord).where(DatasetRecord.id == dataset_id, DatasetRecord.workspace_id == workspace_id)
+        )
+        rule = db.scalar(
+            select(QualityRuleRecord).where(
+                QualityRuleRecord.id == rule_id, QualityRuleRecord.workspace_id == workspace_id
+            )
+        )
+        if dataset is None or rule is None:
+            raise HTTPException(404, "Rule or dataset not found.")
+        db.execute(
+            delete(DatasetRuleAssignmentRecord).where(
+                DatasetRuleAssignmentRecord.rule_id == rule_id,
+                DatasetRuleAssignmentRecord.dataset_id == dataset_id,
+            )
+        )
+        db.commit()
 
 
 @router.get("/{rule_id}/executions")
@@ -667,16 +983,34 @@ def rule_execution_history(rule_id: int, user: dict = Depends(require_user)):
     _get_rule(rule_id, user["workspace"]["id"])
     Session = get_session_factory()
     with Session() as db:
-        rows = db.scalars(select(RuleExecutionRecord).where(RuleExecutionRecord.rule_id == rule_id).order_by(RuleExecutionRecord.executed_at.desc())).all()
-        return [{"audit_id": row.audit_id, "outcome": row.outcome, "affected_rows": row.affected_rows,
-                 "affected_rate": row.affected_rate, "message": row.message, "executed_at": row.executed_at} for row in rows]
+        rows = db.scalars(
+            select(RuleExecutionRecord)
+            .where(RuleExecutionRecord.rule_id == rule_id)
+            .order_by(RuleExecutionRecord.executed_at.desc())
+        ).all()
+        return [
+            {
+                "audit_id": row.audit_id,
+                "outcome": row.outcome,
+                "affected_rows": row.affected_rows,
+                "affected_rate": row.affected_rate,
+                "message": row.message,
+                "executed_at": row.executed_at,
+            }
+            for row in rows
+        ]
 
 
 def _get_rule(rule_id: int, workspace_id: int):
     Session = get_session_factory()
     with Session() as db:
-        row = db.scalar(select(QualityRuleRecord).where(QualityRuleRecord.id == rule_id, QualityRuleRecord.workspace_id == workspace_id))
-        if row is None: raise HTTPException(404, "Quality rule not found.")
+        row = db.scalar(
+            select(QualityRuleRecord).where(
+                QualityRuleRecord.id == rule_id, QualityRuleRecord.workspace_id == workspace_id
+            )
+        )
+        if row is None:
+            raise HTTPException(404, "Quality rule not found.")
         return _serialize(row)
 
 
@@ -686,10 +1020,14 @@ def _validate_rule(payload: RuleDefinition) -> None:
     if payload.scope == "dataset" and payload.rule_type != "duplicate_rows":
         raise HTTPException(422, "Only duplicate_rows is currently supported for dataset-level rules.")
     required = {
-        "allowed_values": "values", "regex": "pattern", "numeric_range": None,
-        "length_range": None, "missing_threshold": "max_rate", "expected_type": "type", "stale_days": "days",
+        "allowed_values": "values",
+        "regex": "pattern",
+        "numeric_range": None,
+        "length_range": None,
+        "missing_threshold": "max_rate",
+        "expected_type": "type",
+        "stale_days": "days",
     }
     key = required.get(payload.rule_type)
     if key and key not in payload.parameters:
         raise HTTPException(422, f"{payload.rule_type} rules require the '{key}' parameter.")
-

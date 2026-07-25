@@ -16,23 +16,32 @@ def cardinality_label(unique_count: int, row_count: int) -> str:
     return "medium"
 
 
-def risk_assessment(*, missing_rate: float, outlier_rate: float, constant: bool, inferred_type: str) -> tuple[int, str, list[str]]:
+def risk_assessment(
+    *, missing_rate: float, outlier_rate: float, constant: bool, inferred_type: str
+) -> tuple[int, str, list[str]]:
     score = 0
     signals: list[str] = []
     if inferred_type == "empty":
-        score += 70; signals.append("Column contains no usable values")
+        score += 70
+        signals.append("Column contains no usable values")
     if missing_rate >= 0.5:
-        score += 45; signals.append("More than half of values are missing")
+        score += 45
+        signals.append("More than half of values are missing")
     elif missing_rate >= 0.1:
-        score += 25; signals.append("Material missing-value rate")
+        score += 25
+        signals.append("Material missing-value rate")
     elif missing_rate > 0:
-        score += 8; signals.append("Some values are missing")
+        score += 8
+        signals.append("Some values are missing")
     if outlier_rate >= 0.1:
-        score += 30; signals.append("High numeric outlier rate")
+        score += 30
+        signals.append("High numeric outlier rate")
     elif outlier_rate > 0:
-        score += 12; signals.append("Numeric outliers detected")
+        score += 12
+        signals.append("Numeric outliers detected")
     if constant:
-        score += 20; signals.append("Column has one repeated value")
+        score += 20
+        signals.append("Column has one repeated value")
     score = min(score, 100)
     level = "high" if score >= 50 else "medium" if score >= 20 else "low"
     return score, level, signals

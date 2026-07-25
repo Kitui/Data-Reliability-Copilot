@@ -1,57 +1,65 @@
 from __future__ import annotations
 
-import json
 import re
-from datetime import datetime, timezone
-from typing import Any
+from datetime import UTC, datetime
 
 import pandas as pd
 
-from app.schemas import QualityIssue, RuleExecution, RuleDefinition
+from app.schemas import QualityIssue, RuleDefinition, RuleExecution
 
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
-def execute_quality_rules(frame: pd.DataFrame, rules: list[RuleDefinition], starting_index: int = 1) -> tuple[list[QualityIssue], list[RuleExecution]]:
+def execute_quality_rules(
+    frame: pd.DataFrame, rules: list[RuleDefinition], starting_index: int = 1
+) -> tuple[list[QualityIssue], list[RuleExecution]]:
     issues: list[QualityIssue] = []
     executions: list[RuleExecution] = []
     row_count = max(len(frame), 1)
 
     for offset, rule in enumerate(rules, start=starting_index):
-        started = datetime.now(timezone.utc)
+        started = datetime.now(UTC)
         issue_id = f"QR-{offset:03d}"
         affected_mask, message = _evaluate_rule(frame, rule)
         affected_rows = int(affected_mask.sum()) if affected_mask is not None else 0
         outcome = "failed" if affected_rows else "passed"
         affected_rate = round(affected_rows / row_count, 4)
-        executions.append(RuleExecution(
-            rule_id=rule.id,
-            rule_name=rule.name,
-            rule_type=rule.rule_type,
-            outcome=outcome,
-            affected_rows=affected_rows,
-            affected_rate=affected_rate,
-            message=message,
-            executed_at=started,
-        ))
-        if affected_rows:
-            columns = [rule.column_name] if rule.column_name else list(frame.columns)
-            examples = frame.loc[affected_mask, columns].head(3).fillna("").to_dict(orient="records") if affected_mask is not None else []
-            issues.append(QualityIssue(
-                id=issue_id,
-                category=rule.category,
-                severity=rule.severity,
-                title=f"{rule.name} failed",
-                detail=message,
-                columns=columns,
-                affected_rows=affected_rows,
-                affected_rate=affected_rate,
-                examples=examples,
-                recommendation=rule.recommendation or _default_recommendation(rule),
-                confidence=1.0,
+        executions.append(
+            RuleExecution(
                 rule_id=rule.id,
                 rule_name=rule.name,
-            ))
+                rule_type=rule.rule_type,
+                outcome=outcome,
+                affected_rows=affected_rows,
+                affected_rate=affected_rate,
+                message=message,
+                executed_at=started,
+            )
+        )
+        if affected_rows:
+            columns = [rule.column_name] if rule.column_name else list(frame.columns)
+            examples = (
+                frame.loc[affected_mask, columns].head(3).fillna("").to_dict(orient="records")
+                if affected_mask is not None
+                else []
+            )
+            issues.append(
+                QualityIssue(
+                    id=issue_id,
+                    category=rule.category,
+                    severity=rule.severity,
+                    title=f"{rule.name} failed",
+                    detail=message,
+                    columns=columns,
+                    affected_rows=affected_rows,
+                    affected_rate=affected_rate,
+                    examples=examples,
+                    recommendation=rule.recommendation or _default_recommendation(rule),
+                    confidence=1.0,
+                    rule_id=rule.id,
+                    rule_name=rule.name,
+                )
+            )
     return issues, executions
 
 
@@ -93,7 +101,9 @@ def _evaluate_rule(frame: pd.DataFrame, rule: RuleDefinition) -> tuple[pd.Series
             mask = mask | numeric.lt(float(params["min"]))
         if params.get("max") is not None:
             mask = mask | numeric.gt(float(params["max"]))
-        return mask.fillna(False), f"{int(mask.fillna(False).sum())} rows fall outside the configured numeric range in {column}."
+        return mask.fillna(
+            False
+        ), f"{int(mask.fillna(False).sum())} rows fall outside the configured numeric range in {column}."
     if rule.rule_type == "length_range":
         lengths = text.str.len()
         mask = pd.Series(False, index=frame.index)
@@ -105,8 +115,13 @@ def _evaluate_rule(frame: pd.DataFrame, rule: RuleDefinition) -> tuple[pd.Series
     if rule.rule_type == "missing_threshold":
         threshold = float(params.get("max_rate", 0))
         if float(missing.mean()) <= threshold:
-            return pd.Series(False, index=frame.index), f"Missing rate is within the configured {threshold:.0%} threshold."
-        return missing, f"Missing rate {float(missing.mean()):.2%} exceeds the configured {threshold:.2%} threshold in {column}."
+            return pd.Series(
+                False, index=frame.index
+            ), f"Missing rate is within the configured {threshold:.0%} threshold."
+        return (
+            missing,
+            f"Missing rate {float(missing.mean()):.2%} exceeds the configured {threshold:.2%} threshold in {column}.",
+        )
     if rule.rule_type == "expected_type":
         expected = str(params.get("type", "text"))
         if expected == "numeric":

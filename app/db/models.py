@@ -34,9 +34,7 @@ class IssueRecord(Base):
     __tablename__ = "audit_issues"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    audit_id: Mapped[str] = mapped_column(
-        ForeignKey("audits.audit_id", ondelete="CASCADE"), nullable=False, index=True
-    )
+    audit_id: Mapped[str] = mapped_column(ForeignKey("audits.audit_id", ondelete="CASCADE"), nullable=False, index=True)
     issue_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     category: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
     severity: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
@@ -67,6 +65,7 @@ class UploadRecord(Base):
 
     audit: Mapped[AuditRecord] = relationship(back_populates="upload")
 
+
 class UserRecord(Base):
     __tablename__ = "users"
 
@@ -81,7 +80,9 @@ class UserRecord(Base):
     email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
 
-    memberships: Mapped[list[OrganizationMembershipRecord]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    memberships: Mapped[list[OrganizationMembershipRecord]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
 
     sessions: Mapped[list[SessionRecord]] = relationship(
         back_populates="user", cascade="all, delete-orphan", passive_deletes=True
@@ -92,9 +93,7 @@ class SessionRecord(Base):
     __tablename__ = "user_sessions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
-    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
@@ -150,20 +149,28 @@ class OrganizationRecord(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     slug: Mapped[str] = mapped_column(String(120), nullable=False, unique=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    workspaces: Mapped[list[WorkspaceRecord]] = relationship(back_populates="organization", cascade="all, delete-orphan")
-    memberships: Mapped[list[OrganizationMembershipRecord]] = relationship(back_populates="organization", cascade="all, delete-orphan")
+    workspaces: Mapped[list[WorkspaceRecord]] = relationship(
+        back_populates="organization", cascade="all, delete-orphan"
+    )
+    memberships: Mapped[list[OrganizationMembershipRecord]] = relationship(
+        back_populates="organization", cascade="all, delete-orphan"
+    )
+
 
 class WorkspaceRecord(Base):
     __tablename__ = "workspaces"
     __table_args__ = (UniqueConstraint("organization_id", "slug", name="uq_workspaces_org_slug"),)
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    organization_id: Mapped[int] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     slug: Mapped[str] = mapped_column(String(120), nullable=False)
     description: Mapped[str | None] = mapped_column(String(500))
     is_active: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     organization: Mapped[OrganizationRecord] = relationship(back_populates="workspaces")
+
 
 class OrganizationMembershipRecord(Base):
     __tablename__ = "organization_memberships"
@@ -176,10 +183,13 @@ class OrganizationMembershipRecord(Base):
     organization: Mapped[OrganizationRecord] = relationship(back_populates="memberships")
     user: Mapped[UserRecord] = relationship(back_populates="memberships")
 
+
 class TeamInvitationRecord(Base):
     __tablename__ = "team_invitations"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    organization_id: Mapped[int] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     invited_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     email: Mapped[str] = mapped_column(String(320), nullable=False, index=True)
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -190,12 +200,15 @@ class TeamInvitationRecord(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+
 class DatasetRecord(Base):
     __tablename__ = "datasets"
     __table_args__ = (UniqueConstraint("workspace_id", "name", name="uq_datasets_workspace_name"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id: Mapped[int] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     domain: Mapped[str] = mapped_column(String(120), nullable=False, default="General")
     owner_name: Mapped[str] = mapped_column(String(255), nullable=False, default="Unassigned")
@@ -219,7 +232,9 @@ class IssueActivityRecord(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     audit_id: Mapped[str] = mapped_column(ForeignKey("audits.audit_id", ondelete="CASCADE"), nullable=False, index=True)
     issue_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
-    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id: Mapped[int] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     actor_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), index=True)
     actor_name: Mapped[str | None] = mapped_column(String(255))
     action: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
@@ -229,10 +244,13 @@ class IssueActivityRecord(Base):
     note: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
 
+
 class QualityRuleRecord(Base):
     __tablename__ = "quality_rules"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id: Mapped[int] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(String(800))
     rule_type: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
@@ -274,7 +292,9 @@ class DataContractRecord(Base):
     __tablename__ = "data_contracts"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     contract_key: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
-    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id: Mapped[int] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     dataset_id: Mapped[int] = mapped_column(ForeignKey("datasets.id", ondelete="CASCADE"), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(String(800))
@@ -290,10 +310,13 @@ class DataContractRecord(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
+
 class AuditScheduleRecord(Base):
     __tablename__ = "audit_schedules"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id: Mapped[int] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     dataset_id: Mapped[int] = mapped_column(ForeignKey("datasets.id", ondelete="CASCADE"), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     frequency: Mapped[str] = mapped_column(String(24), nullable=False, default="daily")
@@ -317,8 +340,12 @@ class AuditScheduleRecord(Base):
 class ScheduledAuditRunRecord(Base):
     __tablename__ = "scheduled_audit_runs"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    schedule_id: Mapped[int] = mapped_column(ForeignKey("audit_schedules.id", ondelete="CASCADE"), nullable=False, index=True)
-    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
+    schedule_id: Mapped[int] = mapped_column(
+        ForeignKey("audit_schedules.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    workspace_id: Mapped[int] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     dataset_id: Mapped[int] = mapped_column(ForeignKey("datasets.id", ondelete="CASCADE"), nullable=False, index=True)
     audit_id: Mapped[str | None] = mapped_column(ForeignKey("audits.audit_id", ondelete="SET NULL"), index=True)
     status: Mapped[str] = mapped_column(String(24), nullable=False, index=True)
@@ -329,14 +356,19 @@ class ScheduledAuditRunRecord(Base):
     score: Mapped[int | None] = mapped_column(Integer)
     issue_count: Mapped[int | None] = mapped_column(Integer)
     error_message: Mapped[str | None] = mapped_column(Text)
-    background_job_id: Mapped[int | None] = mapped_column(ForeignKey("background_jobs.id", ondelete="SET NULL"), index=True)
+    background_job_id: Mapped[int | None] = mapped_column(
+        ForeignKey("background_jobs.id", ondelete="SET NULL"), index=True
+    )
     scheduled_for: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+
 
 class AlertRecord(Base):
     __tablename__ = "alerts"
     __table_args__ = (UniqueConstraint("workspace_id", "fingerprint", name="uq_alert_workspace_fingerprint"),)
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id: Mapped[int] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     fingerprint: Mapped[str] = mapped_column(String(160), nullable=False)
     alert_type: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
     severity: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
@@ -359,11 +391,14 @@ class AlertRecord(Base):
     dismissed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
+
 class NotificationPreferenceRecord(Base):
     __tablename__ = "notification_preferences"
     __table_args__ = (UniqueConstraint("workspace_id", "user_id", name="uq_notification_pref_workspace_user"),)
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id: Mapped[int] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     in_app_enabled: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     email_enabled: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -378,7 +413,9 @@ class NotificationPreferenceRecord(Base):
 class ConnectorRecord(Base):
     __tablename__ = "connectors"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id: Mapped[int] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     source_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     host_project: Mapped[str] = mapped_column(String(500), nullable=False)
@@ -397,18 +434,25 @@ class ConnectorRecord(Base):
 class ConnectorSyncRecord(Base):
     __tablename__ = "connector_syncs"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    connector_id: Mapped[int] = mapped_column(ForeignKey("connectors.id", ondelete="CASCADE"), nullable=False, index=True)
-    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
+    connector_id: Mapped[int] = mapped_column(
+        ForeignKey("connectors.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    workspace_id: Mapped[int] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     status: Mapped[str] = mapped_column(String(24), nullable=False, index=True)
     discovered_sources: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     message: Mapped[str | None] = mapped_column(Text)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+
 class CopilotSessionRecord(Base):
     __tablename__ = "copilot_sessions"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id: Mapped[int] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     dataset_id: Mapped[int | None] = mapped_column(ForeignKey("datasets.id", ondelete="SET NULL"), index=True)
     audit_id: Mapped[str | None] = mapped_column(ForeignKey("audits.audit_id", ondelete="SET NULL"), index=True)
@@ -422,8 +466,12 @@ class CopilotSessionRecord(Base):
 class CopilotMessageRecord(Base):
     __tablename__ = "copilot_messages"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    session_id: Mapped[int] = mapped_column(ForeignKey("copilot_sessions.id", ondelete="CASCADE"), nullable=False, index=True)
-    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
+    session_id: Mapped[int] = mapped_column(
+        ForeignKey("copilot_sessions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    workspace_id: Mapped[int] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     role: Mapped[str] = mapped_column(String(16), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     evidence_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
@@ -433,7 +481,9 @@ class CopilotMessageRecord(Base):
 class ActionPointRecord(Base):
     __tablename__ = "action_points"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id: Mapped[int] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     dataset_id: Mapped[int | None] = mapped_column(ForeignKey("datasets.id", ondelete="SET NULL"), index=True)
     audit_id: Mapped[str | None] = mapped_column(ForeignKey("audits.audit_id", ondelete="SET NULL"), index=True)
     session_id: Mapped[int | None] = mapped_column(ForeignKey("copilot_sessions.id", ondelete="SET NULL"), index=True)
@@ -444,10 +494,13 @@ class ActionPointRecord(Base):
     created_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
+
 class ReportRecord(Base):
     __tablename__ = "reports"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id: Mapped[int] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     report_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
@@ -460,7 +513,9 @@ class ReportRecord(Base):
 class ReportScheduleRecord(Base):
     __tablename__ = "report_schedules"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id: Mapped[int] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     report_type: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -477,7 +532,9 @@ class BackgroundJobRecord(Base):
     __table_args__ = (UniqueConstraint("workspace_id", "idempotency_key", name="uq_background_job_idempotency"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id: Mapped[int] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     created_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), index=True)
     job_type: Mapped[str] = mapped_column(String(48), nullable=False, index=True)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="queued", index=True)

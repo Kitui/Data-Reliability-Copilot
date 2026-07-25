@@ -7,10 +7,12 @@ from app.privacy import scan_dataframe
 
 
 def test_email_verification_flag_is_not_treated_as_email_or_pii():
-    frame = pd.DataFrame({
-        "email": ["valid@example.com", "bad-email"],
-        "email_verified": [True, False],
-    })
+    frame = pd.DataFrame(
+        {
+            "email": ["valid@example.com", "bad-email"],
+            "email_verified": [True, False],
+        }
+    )
     result = audit_dataframe(frame, "customers.csv")
     titles = [issue.title for issue in result.issues]
     assert "Invalid email format in email" in titles

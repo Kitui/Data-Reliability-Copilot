@@ -42,7 +42,11 @@ def compare_audits(baseline: AuditResult, candidate: AuditResult) -> AuditCompar
             "removed_columns": sorted(baseline_columns.keys() - candidate_columns.keys()),
         },
         type_changes=[
-            {"column": name, "before": str(baseline_columns[name].inferred_type), "after": str(candidate_columns[name].inferred_type)}
+            {
+                "column": name,
+                "before": str(baseline_columns[name].inferred_type),
+                "after": str(candidate_columns[name].inferred_type),
+            }
             for name in sorted(shared_columns)
             if baseline_columns[name].inferred_type != candidate_columns[name].inferred_type
         ],

@@ -1,18 +1,18 @@
-from pathlib import Path
 import sys
 import types
+from pathlib import Path
 
 import pytest
 
-from app.auditor import audit_dataframe
 from app.analyst import answer_question
+from app.auditor import audit_dataframe
 from app.comparison import compare_audits
 from app.contracts import contract_to_rule_config, generate_contract
 from app.ingestion import read_csv_path
 from app.ml_readiness import assess_ml_readiness
-from app.reports import build_html_report, build_markdown_report
 from app.remediation import build_remediation_plan
-from app.schemas import RuleDefinition, AnalystChatMessage, AuditRuleConfig, LlmAuditSummary, UploadedFileInfo
+from app.reports import build_html_report, build_markdown_report
+from app.schemas import AnalystChatMessage, AuditRuleConfig, LlmAuditSummary, RuleDefinition, UploadedFileInfo
 from app.storage import AuditStore
 from app.summaries import build_llm_context
 
@@ -277,7 +277,7 @@ def test_analyst_fallback_covers_broad_data_copilot_topics() -> None:
 
     answers = [answer_question(result, question).answer for question, _ in checks]
 
-    for answer, (_, expected) in zip(answers, checks):
+    for answer, (_, expected) in zip(answers, checks, strict=False):
         assert expected in answer
     assert len(set(answers)) == len(answers)
 
@@ -356,8 +356,15 @@ def test_contract_generation_prioritizes_assigned_rules_over_observed_bad_values
     frame = read_csv_path(Path("samples/customers_dirty.csv"))
     result = audit_dataframe(frame, "customers_dirty.csv")
     rules = [
-        RuleDefinition(name="Status domain", rule_type="allowed_values", column_name="status", parameters={"values": ["Active", "Inactive"]}),
-        RuleDefinition(name="Spend non-negative", rule_type="numeric_range", column_name="monthly_spend", parameters={"min": 0}),
+        RuleDefinition(
+            name="Status domain",
+            rule_type="allowed_values",
+            column_name="status",
+            parameters={"values": ["Active", "Inactive"]},
+        ),
+        RuleDefinition(
+            name="Spend non-negative", rule_type="numeric_range", column_name="monthly_spend", parameters={"min": 0}
+        ),
         RuleDefinition(name="Customer required", rule_type="required", column_name="customer_id"),
         RuleDefinition(name="Email format", rule_type="email", column_name="email"),
     ]

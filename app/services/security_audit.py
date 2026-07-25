@@ -42,19 +42,21 @@ def record_security_event(
     Session = get_session_factory()
     try:
         with Session() as db:
-            db.add(AdministrativeAuditLogRecord(
-                workspace_id=workspace_id,
-                organization_id=organization_id,
-                actor_user_id=actor_user_id,
-                action=action,
-                resource_type=resource_type,
-                resource_id=str(resource_id) if resource_id is not None else None,
-                outcome=outcome,
-                ip_address=request.client.host if request and request.client else None,
-                user_agent=(request.headers.get("user-agent") or "")[:500] if request else None,
-                details_json=_safe_details(details),
-                created_at=utcnow(),
-            ))
+            db.add(
+                AdministrativeAuditLogRecord(
+                    workspace_id=workspace_id,
+                    organization_id=organization_id,
+                    actor_user_id=actor_user_id,
+                    action=action,
+                    resource_type=resource_type,
+                    resource_id=str(resource_id) if resource_id is not None else None,
+                    outcome=outcome,
+                    ip_address=request.client.host if request and request.client else None,
+                    user_agent=(request.headers.get("user-agent") or "")[:500] if request else None,
+                    details_json=_safe_details(details),
+                    created_at=utcnow(),
+                )
+            )
             db.commit()
     except Exception:
         # Security logging must never disclose secrets or break the primary action.
@@ -72,7 +74,11 @@ def record_authenticated_mutation(request: Request, status_code: int) -> None:
         return
     Session = get_session_factory()
     with Session() as db:
-        session = db.scalar(select(SessionRecord).where(SessionRecord.token_hash == token_digest(raw), SessionRecord.revoked_at.is_(None)))
+        session = db.scalar(
+            select(SessionRecord).where(
+                SessionRecord.token_hash == token_digest(raw), SessionRecord.revoked_at.is_(None)
+            )
+        )
         if not session:
             return
         workspace = db.get(WorkspaceRecord, session.active_workspace_id) if session.active_workspace_id else None

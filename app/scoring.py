@@ -79,28 +79,29 @@ def score_audit(
         weighted_penalty = raw_penalty * confidence * rule_multiplier * criticality * status_multiplier
         bucket = CATEGORY_BUCKETS.get(issue.category, "reliability")
         deductions_by_dimension[bucket] += weighted_penalty
-        deductions.append(ScoreDeduction(
-            issue_id=issue.id,
-            category=bucket,
-            severity=issue.severity,
-            status=issue.status,
-            affected_rate=issue.affected_rate,
-            raw_penalty=round(raw_penalty, 3),
-            weighted_penalty=round(weighted_penalty, 3),
-            reason=(
-                f"{issue.severity.title()} severity affecting {issue.affected_rate:.1%} of rows"
-                + ("; rule-backed finding" if issue.rule_id is not None else "")
-                + ("; accepted-risk discount applied" if issue.status == "accepted_risk" else "")
-            ),
-        ))
+        deductions.append(
+            ScoreDeduction(
+                issue_id=issue.id,
+                category=bucket,
+                severity=issue.severity,
+                status=issue.status,
+                affected_rate=issue.affected_rate,
+                raw_penalty=round(raw_penalty, 3),
+                weighted_penalty=round(weighted_penalty, 3),
+                reason=(
+                    f"{issue.severity.title()} severity affecting {issue.affected_rate:.1%} of rows"
+                    + ("; rule-backed finding" if issue.rule_id is not None else "")
+                    + ("; accepted-risk discount applied" if issue.status == "accepted_risk" else "")
+                ),
+            )
+        )
 
     if profile.duplicate_row_rate > 0:
         duplicate_penalty = min(15.0, 4.0 + 18.0 * math.sqrt(profile.duplicate_row_rate)) * criticality
         deductions_by_dimension["uniqueness"] += duplicate_penalty
 
     dimension_scores = {
-        name: max(0, min(100, int(round(100 - deductions_by_dimension.get(name, 0.0)))))
-        for name in weights
+        name: max(0, min(100, int(round(100 - deductions_by_dimension.get(name, 0.0))))) for name in weights
     }
     overall = int(round(sum(dimension_scores[name] * weights[name] for name in weights)))
     total_penalty = round(sum(deductions_by_dimension.values()), 3)

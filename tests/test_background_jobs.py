@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 
 from app.auth import ensure_bootstrap_admin
 from app.db.migrations import run_migrations
-from app.jobs.service import create_job, get_job, serialise_job
+from app.jobs.service import create_job, serialise_job
 from app.jobs.types import JobStatus, JobType
 from app.main import create_app
 from app.tenancy import ensure_bootstrap_tenant

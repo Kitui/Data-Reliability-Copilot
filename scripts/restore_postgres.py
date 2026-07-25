@@ -21,9 +21,19 @@ def main() -> None:
     if parsed.password:
         env["PGPASSWORD"] = parsed.password
     command = [
-        "pg_restore", "--clean", "--if-exists", "--no-owner", "--no-privileges",
-        "--host", parsed.hostname or "localhost", "--port", str(parsed.port or 5432),
-        "--username", parsed.username or "postgres", "--dbname", parsed.path.lstrip("/"),
+        "pg_restore",
+        "--clean",
+        "--if-exists",
+        "--no-owner",
+        "--no-privileges",
+        "--host",
+        parsed.hostname or "localhost",
+        "--port",
+        str(parsed.port or 5432),
+        "--username",
+        parsed.username or "postgres",
+        "--dbname",
+        parsed.path.lstrip("/"),
         str(backup),
     ]
     subprocess.run(command, check=True, env=env)

@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import select
 
-from app.db.models import AuditScheduleRecord, BackgroundJobRecord, DatasetRecord, ScheduledAuditRunRecord
+from app.db.models import AuditScheduleRecord, DatasetRecord, ScheduledAuditRunRecord
 from app.db.session import get_session_factory
 from app.jobs.runtime import get_dispatcher
 from app.jobs.service import create_job, serialise_job
@@ -14,11 +13,11 @@ from app.jobs.types import JobType
 
 
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def ensure_utc(value: datetime) -> datetime:
-    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+    return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
 
 
 def _next_occurrence(schedule: AuditScheduleRecord, after: datetime) -> datetime:
@@ -159,26 +158,30 @@ def dispatch_due_schedules(*, limit: int = 25, actor_name: str = "Scheduled auto
             schedule.claimed_at = now
             schedule.updated_at = now
             db.flush()
-            claimed.append({
-                "schedule_id": schedule.id,
-                "run_id": run.id,
-                "workspace_id": schedule.workspace_id,
-                "occurrence_key": due_at.isoformat(),
-            })
+            claimed.append(
+                {
+                    "schedule_id": schedule.id,
+                    "run_id": run.id,
+                    "workspace_id": schedule.workspace_id,
+                    "occurrence_key": due_at.isoformat(),
+                }
+            )
         db.commit()
 
     jobs: list[dict[str, Any]] = []
     for item in claimed:
         try:
-            jobs.append(_create_job_for_run(
-                schedule_id=item["schedule_id"],
-                run_id=item["run_id"],
-                workspace_id=item["workspace_id"],
-                user_id=None,
-                actor_name=actor_name,
-                triggered_by="schedule",
-                occurrence_key=item["occurrence_key"],
-            ))
+            jobs.append(
+                _create_job_for_run(
+                    schedule_id=item["schedule_id"],
+                    run_id=item["run_id"],
+                    workspace_id=item["workspace_id"],
+                    user_id=None,
+                    actor_name=actor_name,
+                    triggered_by="schedule",
+                    occurrence_key=item["occurrence_key"],
+                )
+            )
         except Exception as exc:
             with Session() as db:
                 run = db.get(ScheduledAuditRunRecord, item["run_id"])

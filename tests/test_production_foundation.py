@@ -5,8 +5,8 @@ from pathlib import Path
 import pytest
 
 from app.core.config import ConfigurationError, Settings
-from app.services.object_storage import LocalObjectStorage, StorageError
 from app.jobs.types import JobStatus, JobType
+from app.services.object_storage import LocalObjectStorage, StorageError
 
 
 def test_production_configuration_rejects_unsafe_defaults(monkeypatch):

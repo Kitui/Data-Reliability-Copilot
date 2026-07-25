@@ -51,7 +51,9 @@ def run_job(job_id: int) -> None:
         if handler is None:
             raise RuntimeError(f"No background handler is registered for {row.job_type}.")
         update_job(job_id, status=JobStatus.PROCESSING, progress=35)
-        context = JobContext(job_id=row.id, workspace_id=row.workspace_id, job_type=JobType(row.job_type), payload=payload)
+        context = JobContext(
+            job_id=row.id, workspace_id=row.workspace_id, job_type=JobType(row.job_type), payload=payload
+        )
         result = handler.execute(context)
         current = get_job(job_id)
         if current is not None and current.status == JobStatus.CANCELLED:

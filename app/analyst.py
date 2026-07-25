@@ -144,8 +144,7 @@ def build_column_overview_answer(audit: AuditResult, column_name: str) -> str:
     related = [issue for issue in audit.issues if column.name in issue.columns]
     stats = safe_stats_text(column.stats)
     issue_text = (
-        " Related issues: "
-        + "; ".join(f"{issue.id} {issue.title} ({issue.severity})" for issue in related[:4])
+        " Related issues: " + "; ".join(f"{issue.id} {issue.title} ({issue.severity})" for issue in related[:4])
         if related
         else " No issues are directly tied to this column."
     )

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Iterable
 
 import pandas as pd
 
@@ -94,7 +93,9 @@ def classify_sensitive_column(name: str, series: pd.Series) -> PrivacySignal | N
             "email": sum(bool(EMAIL_RE.match(v)) for v in values) / sample_size,
             "phone_number": 0.0 if date_like_name else sum(bool(PHONE_RE.match(v)) for v in values) / sample_size,
             "network_identifier": sum(bool(IP_RE.match(v)) for v in values) / sample_size,
-            "payment_card": 0.0 if date_like_name else sum(bool(CARD_RE.match(v)) and _luhn(v) for v in values) / sample_size,
+            "payment_card": 0.0
+            if date_like_name
+            else sum(bool(CARD_RE.match(v)) and _luhn(v) for v in values) / sample_size,
         }
         pattern_meta = {
             "email": ("high", "Mask the local part or tokenize the full address."),
@@ -135,18 +136,22 @@ def scan_dataframe(frame: pd.DataFrame) -> dict:
         signal = classify_sensitive_column(str(column), frame[column])
         if signal is None:
             continue
-        findings.append({
-            "column": str(column),
-            "classification": signal.classification,
-            "sensitivity": signal.sensitivity,
-            "confidence": signal.confidence,
-            "reasons": signal.reasons,
-            "masking_recommendation": signal.masking,
-        })
+        findings.append(
+            {
+                "column": str(column),
+                "classification": signal.classification,
+                "sensitivity": signal.sensitivity,
+                "confidence": signal.confidence,
+                "reasons": signal.reasons,
+                "masking_recommendation": signal.masking,
+            }
+        )
     counts = {level: sum(f["sensitivity"] == level for f in findings) for level in SENSITIVITY_ORDER}
     return {
         "sensitive_column_count": len(findings),
-        "highest_sensitivity": max((f["sensitivity"] for f in findings), key=lambda x: SENSITIVITY_ORDER[x], default="low"),
+        "highest_sensitivity": max(
+            (f["sensitivity"] for f in findings), key=lambda x: SENSITIVITY_ORDER[x], default="low"
+        ),
         "counts": counts,
         "findings": findings,
     }

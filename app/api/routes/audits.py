@@ -1,42 +1,58 @@
 from __future__ import annotations
 
 import json
-from datetime import timezone
+from datetime import UTC
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import HTMLResponse, PlainTextResponse
-from sqlalchemy import select
 from pydantic import ValidationError
+from sqlalchemy import select
 
 from app.analyst import answer_question
+from app.api.auth_dependencies import require_user
 from app.api.dependencies import get_audit_store
 from app.api.routes.datasets import register_audit_dataset
-from app.api.auth_dependencies import require_user
+from app.api.routes.quality_rules import assigned_rules_for_dataset, persist_rule_executions
 from app.auditor import audit_dataframe
 from app.comparison import compare_audits
 from app.contracts import generate_contract
 from app.core.config import get_settings
-from app.services.dataset_files import DatasetFileError, build_dataset_file_service
 from app.db.models import AuditRecord, UploadRecord
 from app.db.session import get_session_factory
 from app.ingestion import IngestionError, read_csv_bytes, read_csv_path
-from app.ml_readiness import assess_ml_readiness
-from app.api.routes.quality_rules import assigned_rules_for_dataset, persist_rule_executions
-from app.remediation import apply_remediation_actions, build_remediation_plan
-from app.reports import build_html_report, build_markdown_report
-from app.schemas import (
-    AnalystAnswer, AnalystQuestion, AppliedRecommendation, AuditComparison, AuditListItem, AuditResult,
-    AuditRuleConfig, DataContract, IssueStatusUpdate, IssueCommentCreate, IssueLifecycleDetail, MlReadiness, QualityIssue,
-    RemediationApplyResult, RemediationPlan, RemediationPreview, RemediationRequest, UploadedFileInfo, ScoreRecalculationRequest,
-)
-from app.summaries import summarize_audit
-from app.scoring import score_audit
 from app.issue_lifecycle import list_activities, record_activity
 from app.jobs.runtime import get_dispatcher
 from app.jobs.service import create_job, serialise_job
 from app.jobs.types import JobType
+from app.ml_readiness import assess_ml_readiness
+from app.remediation import apply_remediation_actions, build_remediation_plan
+from app.reports import build_html_report, build_markdown_report
+from app.schemas import (
+    AnalystAnswer,
+    AnalystQuestion,
+    AppliedRecommendation,
+    AuditComparison,
+    AuditListItem,
+    AuditResult,
+    AuditRuleConfig,
+    DataContract,
+    IssueCommentCreate,
+    IssueLifecycleDetail,
+    IssueStatusUpdate,
+    MlReadiness,
+    QualityIssue,
+    RemediationApplyResult,
+    RemediationPlan,
+    RemediationPreview,
+    RemediationRequest,
+    ScoreRecalculationRequest,
+    UploadedFileInfo,
+)
+from app.scoring import score_audit
+from app.services.dataset_files import DatasetFileError, build_dataset_file_service
+from app.summaries import summarize_audit
 
 router = APIRouter(prefix="/audits", tags=["Audits"])
 
@@ -58,7 +74,9 @@ def parse_rule_config(raw_rules: str | None) -> AuditRuleConfig:
     return AuditRuleConfig.model_validate(payload)
 
 
-def save_upload(content: bytes, original_filename: str, content_type: str | None, workspace_id: int) -> UploadedFileInfo:
+def save_upload(
+    content: bytes, original_filename: str, content_type: str | None, workspace_id: int
+) -> UploadedFileInfo:
     return build_dataset_file_service().save_upload(content, original_filename, content_type, workspace_id)
 
 
@@ -66,7 +84,7 @@ def _utc_datetime(value):
     """Return one canonical UTC instant for SQLite and timezone-aware values."""
     if value is None:
         return value
-    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+    return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
 
 
 def _normalise_audit_time(audit: AuditResult) -> AuditResult:
@@ -83,7 +101,11 @@ def list_audits(user: dict[str, object] = Depends(require_user)) -> list[AuditLi
 
 
 @router.post("/upload/async", status_code=202)
-async def upload_audit_async(file: UploadFile = File(...), rules_json: str | None = Form(default=None), user: dict[str, object] = Depends(require_user)):
+async def upload_audit_async(
+    file: UploadFile = File(...),
+    rules_json: str | None = Form(default=None),
+    user: dict[str, object] = Depends(require_user),
+):
     """Persist an upload, queue its audit, and return immediately with a trackable job."""
     workspace_id = int(user["workspace"]["id"])
     content = await file.read()
@@ -128,7 +150,11 @@ async def upload_audit_async(file: UploadFile = File(...), rules_json: str | Non
 
 
 @router.post("/upload", response_model=AuditResult)
-async def upload_audit(file: UploadFile = File(...), rules_json: str | None = Form(default=None), user: dict[str, object] = Depends(require_user)) -> AuditResult:
+async def upload_audit(
+    file: UploadFile = File(...),
+    rules_json: str | None = Form(default=None),
+    user: dict[str, object] = Depends(require_user),
+) -> AuditResult:
     workspace_id = int(user["workspace"]["id"])
     upload_info: UploadedFileInfo | None = None
     try:
@@ -137,7 +163,13 @@ async def upload_audit(file: UploadFile = File(...), rules_json: str | None = Fo
         upload_info = save_upload(content, file.filename or "uploaded.csv", file.content_type, workspace_id)
         frame = read_csv_bytes(content, file.filename or "uploaded.csv")
         quality_rules = assigned_rules_for_dataset(workspace_id, file.filename or "uploaded.csv")
-        result = audit_dataframe(frame, file.filename or "uploaded.csv", rule_config=rule_config, upload=upload_info, quality_rules=quality_rules)
+        result = audit_dataframe(
+            frame,
+            file.filename or "uploaded.csv",
+            rule_config=rule_config,
+            upload=upload_info,
+            quality_rules=quality_rules,
+        )
         result.audit_kind = "dataset_import"
         result.dataset_version = 1
     except (IngestionError, DatasetFileError) as exc:
@@ -176,10 +208,12 @@ def rerun_audit(audit_id: str, user: dict[str, object] = Depends(require_user)) 
     source_audit = load_audit(audit_id, workspace_id)
     Session = get_session_factory()
     with Session() as db:
-        audit_record = db.scalar(select(AuditRecord).where(
-            AuditRecord.audit_id == audit_id,
-            AuditRecord.workspace_id == workspace_id,
-        ))
+        audit_record = db.scalar(
+            select(AuditRecord).where(
+                AuditRecord.audit_id == audit_id,
+                AuditRecord.workspace_id == workspace_id,
+            )
+        )
         upload_record = db.scalar(select(UploadRecord).where(UploadRecord.audit_id == audit_id))
 
     if audit_record is None:
@@ -191,7 +225,9 @@ def rerun_audit(audit_id: str, user: dict[str, object] = Depends(require_user)) 
             if not files.exists(upload_record.relative_path):
                 raise HTTPException(status_code=409, detail="The source file for this audit is no longer available.")
             content = files.read_bytes(upload_record.relative_path)
-            upload_info = save_upload(content, upload_record.original_filename, upload_record.content_type, int(workspace_id))
+            upload_info = save_upload(
+                content, upload_record.original_filename, upload_record.content_type, int(workspace_id)
+            )
             frame = read_csv_bytes(content, upload_record.original_filename)
         elif source_audit.dataset_name == get_settings().sample_dataset.name:
             source_path = get_settings().sample_dataset
@@ -250,7 +286,9 @@ def configured_sample_audit(config: AuditRuleConfig, user: dict[str, object] = D
 
 
 @router.get("/compare/{baseline_audit_id}/{candidate_audit_id}", response_model=AuditComparison)
-def compare_saved_audits(baseline_audit_id: str, candidate_audit_id: str, user: dict[str, object] = Depends(require_user)) -> AuditComparison:
+def compare_saved_audits(
+    baseline_audit_id: str, candidate_audit_id: str, user: dict[str, object] = Depends(require_user)
+) -> AuditComparison:
     wid = user["workspace"]["id"]
     return jsonable_encoder(compare_audits(load_audit(baseline_audit_id, wid), load_audit(candidate_audit_id, wid)))
 
@@ -266,7 +304,9 @@ def get_issues(audit_id: str, user: dict[str, object] = Depends(require_user)) -
 
 
 @router.post("/{audit_id}/issues/{issue_id}/apply-recommendation", response_model=AppliedRecommendation)
-def apply_issue_recommendation(audit_id: str, issue_id: str, user: dict[str, object] = Depends(require_user)) -> AppliedRecommendation:
+def apply_issue_recommendation(
+    audit_id: str, issue_id: str, user: dict[str, object] = Depends(require_user)
+) -> AppliedRecommendation:
     result = load_audit(audit_id, user["workspace"]["id"])
     issue = next((item for item in result.issues if item.id == issue_id), None)
     if issue is None:
@@ -293,20 +333,36 @@ def apply_issue_recommendation(audit_id: str, issue_id: str, user: dict[str, obj
     result.score = score_audit(result.profile, result.issues, result.scoring_context)
     result.summary = summarize_audit(result.profile, result.issues, result.score)
     get_audit_store().save(result, user["workspace"]["id"])
-    record_activity(audit_id=audit_id, issue_id=issue_id, workspace_id=user["workspace"]["id"],
-                    actor_user_id=int(user["id"]), actor_name=str(user.get("full_name") or user.get("email")),
-                    action="recommendation_applied", field_name="status", previous_value="open", new_value="fixed",
-                    note=issue.resolution_note)
+    record_activity(
+        audit_id=audit_id,
+        issue_id=issue_id,
+        workspace_id=user["workspace"]["id"],
+        actor_user_id=int(user["id"]),
+        actor_name=str(user.get("full_name") or user.get("email")),
+        action="recommendation_applied",
+        field_name="status",
+        previous_value="open",
+        new_value="fixed",
+        note=issue.resolution_note,
+    )
 
-    return jsonable_encoder(AppliedRecommendation(
-        audit_id=result.audit_id, issue_id=issue.id, previous_score=previous_score,
-        updated_score=result.score.overall, score_improvement=result.score.overall - previous_score,
-        resolution_note=issue.resolution_note, audit=result,
-    ))
+    return jsonable_encoder(
+        AppliedRecommendation(
+            audit_id=result.audit_id,
+            issue_id=issue.id,
+            previous_score=previous_score,
+            updated_score=result.score.overall,
+            score_improvement=result.score.overall - previous_score,
+            resolution_note=issue.resolution_note,
+            audit=result,
+        )
+    )
 
 
 @router.patch("/{audit_id}/issues/{issue_id}", response_model=AuditResult)
-def update_issue_status(audit_id: str, issue_id: str, update: IssueStatusUpdate, user: dict[str, object] = Depends(require_user)) -> AuditResult:
+def update_issue_status(
+    audit_id: str, issue_id: str, update: IssueStatusUpdate, user: dict[str, object] = Depends(require_user)
+) -> AuditResult:
     workspace_id = user["workspace"]["id"]
     result = load_audit(audit_id, workspace_id)
     issue = next((item for item in result.issues if item.id == issue_id), None)
@@ -326,17 +382,29 @@ def update_issue_status(audit_id: str, issue_id: str, update: IssueStatusUpdate,
             continue
         setattr(issue, field_name, value)
         record_activity(
-            audit_id=audit_id, issue_id=issue_id, workspace_id=workspace_id,
-            actor_user_id=int(user["id"]), actor_name=actor_name,
-            action="field_updated", field_name=field_name,
-            previous_value=previous, new_value=value,
+            audit_id=audit_id,
+            issue_id=issue_id,
+            workspace_id=workspace_id,
+            actor_user_id=int(user["id"]),
+            actor_name=actor_name,
+            action="field_updated",
+            field_name=field_name,
+            previous_value=previous,
+            new_value=value,
         )
-    issue.updated_at = __import__('datetime').datetime.now(__import__('datetime').timezone.utc)
+    issue.updated_at = __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
     if issue.status == "reopened":
         issue.status = "open"
-        record_activity(audit_id=audit_id, issue_id=issue_id, workspace_id=workspace_id,
-                        actor_user_id=int(user["id"]), actor_name=actor_name,
-                        action="reopened", field_name="status", new_value="open")
+        record_activity(
+            audit_id=audit_id,
+            issue_id=issue_id,
+            workspace_id=workspace_id,
+            actor_user_id=int(user["id"]),
+            actor_name=actor_name,
+            action="reopened",
+            field_name="status",
+            new_value="open",
+        )
 
     result.score = score_audit(result.profile, result.issues, result.scoring_context)
     result.summary = summarize_audit(result.profile, result.issues, result.score)
@@ -346,42 +414,60 @@ def update_issue_status(audit_id: str, issue_id: str, update: IssueStatusUpdate,
 
 
 @router.get("/{audit_id}/issues/{issue_id}/lifecycle", response_model=IssueLifecycleDetail)
-def get_issue_lifecycle(audit_id: str, issue_id: str, user: dict[str, object] = Depends(require_user)) -> IssueLifecycleDetail:
+def get_issue_lifecycle(
+    audit_id: str, issue_id: str, user: dict[str, object] = Depends(require_user)
+) -> IssueLifecycleDetail:
     workspace_id = user["workspace"]["id"]
     result = load_audit(audit_id, workspace_id)
     issue = next((item for item in result.issues if item.id == issue_id), None)
     if issue is None:
         raise HTTPException(status_code=404, detail="Issue not found.")
-    return jsonable_encoder(IssueLifecycleDetail(issue=issue, activities=list_activities(audit_id, issue_id, workspace_id)))
+    return jsonable_encoder(
+        IssueLifecycleDetail(issue=issue, activities=list_activities(audit_id, issue_id, workspace_id))
+    )
 
 
 @router.post("/{audit_id}/issues/{issue_id}/comments", response_model=IssueLifecycleDetail)
-def add_issue_comment(audit_id: str, issue_id: str, comment: IssueCommentCreate, user: dict[str, object] = Depends(require_user)) -> IssueLifecycleDetail:
+def add_issue_comment(
+    audit_id: str, issue_id: str, comment: IssueCommentCreate, user: dict[str, object] = Depends(require_user)
+) -> IssueLifecycleDetail:
     workspace_id = user["workspace"]["id"]
     result = load_audit(audit_id, workspace_id)
     issue = next((item for item in result.issues if item.id == issue_id), None)
     if issue is None:
         raise HTTPException(status_code=404, detail="Issue not found.")
-    record_activity(audit_id=audit_id, issue_id=issue_id, workspace_id=workspace_id,
-                    actor_user_id=int(user["id"]), actor_name=str(user.get("full_name") or user.get("email")),
-                    action="comment_added", note=comment.body.strip())
-    return jsonable_encoder(IssueLifecycleDetail(issue=issue, activities=list_activities(audit_id, issue_id, workspace_id)))
+    record_activity(
+        audit_id=audit_id,
+        issue_id=issue_id,
+        workspace_id=workspace_id,
+        actor_user_id=int(user["id"]),
+        actor_name=str(user.get("full_name") or user.get("email")),
+        action="comment_added",
+        note=comment.body.strip(),
+    )
+    return jsonable_encoder(
+        IssueLifecycleDetail(issue=issue, activities=list_activities(audit_id, issue_id, workspace_id))
+    )
 
 
 @router.get("/{audit_id}/score-breakdown")
 def get_score_breakdown(audit_id: str, user: dict[str, object] = Depends(require_user)) -> dict[str, object]:
     result = load_audit(audit_id, user["workspace"]["id"])
-    return jsonable_encoder({
-        "audit_id": result.audit_id,
-        "dataset_name": result.dataset_name,
-        "score": result.score,
-        "scoring_context": result.scoring_context,
-        "top_deductions": result.score.deductions[:10],
-    })
+    return jsonable_encoder(
+        {
+            "audit_id": result.audit_id,
+            "dataset_name": result.dataset_name,
+            "score": result.score,
+            "scoring_context": result.scoring_context,
+            "top_deductions": result.score.deductions[:10],
+        }
+    )
 
 
 @router.post("/{audit_id}/score/recalculate", response_model=AuditResult)
-def recalculate_score(audit_id: str, update: ScoreRecalculationRequest, user: dict[str, object] = Depends(require_user)) -> AuditResult:
+def recalculate_score(
+    audit_id: str, update: ScoreRecalculationRequest, user: dict[str, object] = Depends(require_user)
+) -> AuditResult:
     result = load_audit(audit_id, user["workspace"]["id"])
     payload = result.scoring_context.model_dump()
     for key, value in update.model_dump(exclude_none=True).items():
@@ -397,18 +483,25 @@ def recalculate_score(audit_id: str, update: ScoreRecalculationRequest, user: di
 @router.get("/{audit_id}/report")
 def get_report(audit_id: str, user: dict[str, object] = Depends(require_user)) -> dict[str, object]:
     result = load_audit(audit_id, user["workspace"]["id"])
-    return {"dataset": result.dataset_name, "quality_score": result.score.overall,
-            "risk_level": result.summary.risk_level, "executive_summary": result.summary.executive_summary,
-            "recommended_focus": result.summary.recommended_focus, "issue_count": sum(1 for issue in result.issues if issue.status not in {"fixed", "resolved", "ignored"}),
-            "critical_or_high_issues": [i.model_dump() for i in result.issues if i.severity in {"critical", "high"}]}
+    return {
+        "dataset": result.dataset_name,
+        "quality_score": result.score.overall,
+        "risk_level": result.summary.risk_level,
+        "executive_summary": result.summary.executive_summary,
+        "recommended_focus": result.summary.recommended_focus,
+        "issue_count": sum(1 for issue in result.issues if issue.status not in {"fixed", "resolved", "ignored"}),
+        "critical_or_high_issues": [i.model_dump() for i in result.issues if i.severity in {"critical", "high"}],
+    }
 
 
 @router.get("/{audit_id}/report.md", response_class=PlainTextResponse)
-def get_markdown_report(audit_id: str, user: dict[str, object] = Depends(require_user)) -> str: return build_markdown_report(load_audit(audit_id, user["workspace"]["id"]))
+def get_markdown_report(audit_id: str, user: dict[str, object] = Depends(require_user)) -> str:
+    return build_markdown_report(load_audit(audit_id, user["workspace"]["id"]))
 
 
 @router.get("/{audit_id}/report.html", response_class=HTMLResponse)
-def get_html_report(audit_id: str, user: dict[str, object] = Depends(require_user)) -> str: return build_html_report(load_audit(audit_id, user["workspace"]["id"]))
+def get_html_report(audit_id: str, user: dict[str, object] = Depends(require_user)) -> str:
+    return build_html_report(load_audit(audit_id, user["workspace"]["id"]))
 
 
 @router.get("/{audit_id}/remediation", response_model=RemediationPlan)
@@ -418,7 +511,9 @@ def get_remediation(audit_id: str, user: dict[str, object] = Depends(require_use
 
 def _audit_source_frame(audit_id: str, workspace_id: int):
     with get_session_factory()() as session:
-        record = session.scalar(select(AuditRecord).where(AuditRecord.audit_id == audit_id, AuditRecord.workspace_id == workspace_id))
+        record = session.scalar(
+            select(AuditRecord).where(AuditRecord.audit_id == audit_id, AuditRecord.workspace_id == workspace_id)
+        )
         if record is None or record.upload is None:
             raise HTTPException(status_code=404, detail="Source dataset is not available for this audit.")
         storage_key = record.upload.relative_path
@@ -433,35 +528,59 @@ def _audit_source_frame(audit_id: str, workspace_id: int):
 
 
 @router.post("/{audit_id}/remediation/preview", response_model=RemediationPreview)
-def preview_remediation(audit_id: str, request: RemediationRequest, user: dict[str, object] = Depends(require_user)) -> RemediationPreview:
+def preview_remediation(
+    audit_id: str, request: RemediationRequest, user: dict[str, object] = Depends(require_user)
+) -> RemediationPreview:
     workspace_id = user["workspace"]["id"]
     audit = load_audit(audit_id, workspace_id)
     frame = _audit_source_frame(audit_id, workspace_id)
-    corrected, stats = apply_remediation_actions(frame, audit, request.issue_ids, request.fill_strategy, request.mask_sensitive)
+    corrected, stats = apply_remediation_actions(
+        frame, audit, request.issue_ids, request.fill_strategy, request.mask_sensitive
+    )
     quality_rules = assigned_rules_for_dataset(workspace_id, audit.dataset_name)
-    projected = audit_dataframe(corrected, audit.dataset_name, quality_rules=quality_rules, scoring_context=audit.scoring_context)
-    return jsonable_encoder(RemediationPreview(
-        audit_id=audit_id, selected_actions=len(request.issue_ids), rows_before=len(frame), rows_after=len(corrected),
-        columns_before=len(frame.columns), columns_after=len(corrected.columns), score_before=audit.score.overall,
-        projected_score=projected.score.overall, projected_score_delta=projected.score.overall-audit.score.overall,
-        issues_before=len([i for i in audit.issues if i.status not in {"fixed", "resolved", "ignored"}]),
-        projected_issues=len([i for i in projected.issues if i.status not in {"fixed", "resolved", "ignored"}]),
-        **stats,
-    ))
+    projected = audit_dataframe(
+        corrected, audit.dataset_name, quality_rules=quality_rules, scoring_context=audit.scoring_context
+    )
+    return jsonable_encoder(
+        RemediationPreview(
+            audit_id=audit_id,
+            selected_actions=len(request.issue_ids),
+            rows_before=len(frame),
+            rows_after=len(corrected),
+            columns_before=len(frame.columns),
+            columns_after=len(corrected.columns),
+            score_before=audit.score.overall,
+            projected_score=projected.score.overall,
+            projected_score_delta=projected.score.overall - audit.score.overall,
+            issues_before=len([i for i in audit.issues if i.status not in {"fixed", "resolved", "ignored"}]),
+            projected_issues=len([i for i in projected.issues if i.status not in {"fixed", "resolved", "ignored"}]),
+            **stats,
+        )
+    )
 
 
 @router.post("/{audit_id}/remediation/apply", response_model=RemediationApplyResult)
-def apply_remediation(audit_id: str, request: RemediationRequest, user: dict[str, object] = Depends(require_user)) -> RemediationApplyResult:
+def apply_remediation(
+    audit_id: str, request: RemediationRequest, user: dict[str, object] = Depends(require_user)
+) -> RemediationApplyResult:
     workspace_id = user["workspace"]["id"]
     audit = load_audit(audit_id, workspace_id)
     frame = _audit_source_frame(audit_id, workspace_id)
-    corrected, stats = apply_remediation_actions(frame, audit, request.issue_ids, request.fill_strategy, request.mask_sensitive)
+    corrected, stats = apply_remediation_actions(
+        frame, audit, request.issue_ids, request.fill_strategy, request.mask_sensitive
+    )
     cleaned_name = f"cleaned_{audit.dataset_name}"
     csv_content = corrected.to_csv(index=False).encode("utf-8")
     upload_info = save_upload(csv_content, cleaned_name, "text/csv", int(workspace_id))
     try:
         quality_rules = assigned_rules_for_dataset(workspace_id, audit.dataset_name)
-        corrected_audit = audit_dataframe(corrected, cleaned_name, upload=upload_info, quality_rules=quality_rules, scoring_context=audit.scoring_context)
+        corrected_audit = audit_dataframe(
+            corrected,
+            cleaned_name,
+            upload=upload_info,
+            quality_rules=quality_rules,
+            scoring_context=audit.scoring_context,
+        )
         get_audit_store().save(corrected_audit, workspace_id)
         register_audit_dataset(corrected_audit, workspace_id, str(user.get("full_name") or "Workspace team"))
         persist_rule_executions(corrected_audit.audit_id, corrected_audit.rule_executions)
@@ -471,11 +590,16 @@ def apply_remediation(audit_id: str, request: RemediationRequest, user: dict[str
         except DatasetFileError:
             pass
         raise
-    return jsonable_encoder(RemediationApplyResult(
-        source_audit_id=audit_id, corrected_audit=corrected_audit,
-        download_url=f"/audits/{corrected_audit.audit_id}/source.csv", applied_actions=len(request.issue_ids),
-        changed_cells=stats["changed_cells"], removed_rows=stats["removed_rows"],
-    ))
+    return jsonable_encoder(
+        RemediationApplyResult(
+            source_audit_id=audit_id,
+            corrected_audit=corrected_audit,
+            download_url=f"/audits/{corrected_audit.audit_id}/source.csv",
+            applied_actions=len(request.issue_ids),
+            changed_cells=stats["changed_cells"],
+            removed_rows=stats["removed_rows"],
+        )
+    )
 
 
 @router.get("/{audit_id}/source.csv", response_class=PlainTextResponse)
@@ -483,7 +607,9 @@ def download_audit_source(audit_id: str, user: dict[str, object] = Depends(requi
     workspace_id = user["workspace"]["id"]
     load_audit(audit_id, workspace_id)
     with get_session_factory()() as session:
-        record = session.scalar(select(AuditRecord).where(AuditRecord.audit_id == audit_id, AuditRecord.workspace_id == workspace_id))
+        record = session.scalar(
+            select(AuditRecord).where(AuditRecord.audit_id == audit_id, AuditRecord.workspace_id == workspace_id)
+        )
         if record is None or record.upload is None:
             raise HTTPException(status_code=404, detail="Source dataset is not available.")
         storage_key = record.upload.relative_path
@@ -491,7 +617,11 @@ def download_audit_source(audit_id: str, user: dict[str, object] = Depends(requi
     files = build_dataset_file_service()
     if not files.exists(storage_key):
         raise HTTPException(status_code=404, detail="Source dataset file is missing.")
-    return PlainTextResponse(files.read_bytes(storage_key), media_type="text/csv", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+    return PlainTextResponse(
+        files.read_bytes(storage_key),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/{audit_id}/contract", response_model=DataContract)
@@ -503,12 +633,17 @@ def get_data_contract(audit_id: str, user: dict[str, object] = Depends(require_u
 
 
 @router.get("/{audit_id}/ml-readiness", response_model=MlReadiness)
-def get_ml_readiness(audit_id: str, user: dict[str, object] = Depends(require_user)) -> MlReadiness: return jsonable_encoder(assess_ml_readiness(load_audit(audit_id, user["workspace"]["id"])))
+def get_ml_readiness(audit_id: str, user: dict[str, object] = Depends(require_user)) -> MlReadiness:
+    return jsonable_encoder(assess_ml_readiness(load_audit(audit_id, user["workspace"]["id"])))
 
 
 @router.post("/{audit_id}/analyst", response_model=AnalystAnswer)
-def ask_analyst(audit_id: str, question: AnalystQuestion, user: dict[str, object] = Depends(require_user)) -> AnalystAnswer:
-    return jsonable_encoder(answer_question(load_audit(audit_id, user["workspace"]["id"]), question.question, question.history))
+def ask_analyst(
+    audit_id: str, question: AnalystQuestion, user: dict[str, object] = Depends(require_user)
+) -> AnalystAnswer:
+    return jsonable_encoder(
+        answer_question(load_audit(audit_id, user["workspace"]["id"]), question.question, question.history)
+    )
 
 
 @router.post("/{audit_id}/summary/regenerate", response_model=AuditResult)

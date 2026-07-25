@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+
 import pandas as pd
 
 
@@ -34,8 +35,10 @@ def column_stats(series: pd.Series, inferred_type: str) -> dict[str, Any]:
         if pd.isna(std_value):
             std_value = 0.0
         return {
-            "min": float(values.min()), "max": float(values.max()),
-            "mean": round(float(values.mean()), 4), "median": float(values.median()),
+            "min": float(values.min()),
+            "max": float(values.max()),
+            "mean": round(float(values.mean()), 4),
+            "median": float(values.median()),
             "std_dev": round(std_value, 4),
         }
     if inferred_type == "datetime":
@@ -45,7 +48,8 @@ def column_stats(series: pd.Series, inferred_type: str) -> dict[str, Any]:
     top = text.value_counts().head(5)
     lengths = text.str.len()
     return {
-        "min_length": int(lengths.min()), "max_length": int(lengths.max()),
+        "min_length": int(lengths.min()),
+        "max_length": int(lengths.max()),
         "average_length": round(float(lengths.mean()), 2),
         "top_values": [{"value": str(value), "count": int(count)} for value, count in top.items()],
     }

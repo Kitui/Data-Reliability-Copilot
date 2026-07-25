@@ -8,7 +8,6 @@ import pandas as pd
 
 from app.schemas import AuditRuleConfig, DatasetProfile, QualityIssue, Severity
 
-
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 PHONE_PATTERN = re.compile(r"^\+?[0-9][0-9\s().-]{6,}$")
 NATIONAL_ID_PATTERN = re.compile(r"^\d{6,12}$")
@@ -71,7 +70,9 @@ def detect_issues(
                 column.missing_count,
                 "Confirm whether the field is required, then fill, backfill, or exclude incomplete records.",
                 0.98,
-                _examples(frame, [column.name], frame[column.name].isna() | frame[column.name].astype(str).str.strip().eq("")),
+                _examples(
+                    frame, [column.name], frame[column.name].isna() | frame[column.name].astype(str).str.strip().eq("")
+                ),
             )
 
         if column.unique_count == 1 and profile.row_count > 1:
@@ -212,7 +213,9 @@ def _detect_pii_columns(frame: pd.DataFrame, add_issue) -> None:
     columns = [finding["column"] for finding in findings]
     criticality = {"low": 1, "medium": 2, "high": 3, "critical": 4}
     highest = max(findings, key=lambda item: criticality[item["sensitivity"]])
-    severity = "critical" if highest["sensitivity"] == "critical" else "high" if highest["sensitivity"] == "high" else "medium"
+    severity = (
+        "critical" if highest["sensitivity"] == "critical" else "high" if highest["sensitivity"] == "high" else "medium"
+    )
     classifications = ", ".join(sorted({finding["classification"].replace("_", " ") for finding in findings}))
     add_issue(
         "privacy",
@@ -357,7 +360,7 @@ def _detect_date_quality(frame: pd.DataFrame, add_issue) -> None:
             stale_mask = dates.lt(stale_cutoff)
             if stale_mask.any():
                 add_issue(
-                "timeliness",
+                    "timeliness",
                     "medium",
                     f"Stale timestamp values in {column}",
                     "Some records have not been updated in more than three years.",
@@ -497,7 +500,9 @@ def _detect_configured_rules(
             )
 
     for configured_column, expected_type in config.expected_types.items():
-        profile_column = next((column for column in profile.columns if column.name.lower() == configured_column.lower()), None)
+        profile_column = next(
+            (column for column in profile.columns if column.name.lower() == configured_column.lower()), None
+        )
         if profile_column and profile_column.inferred_type != expected_type:
             add_issue(
                 "schema",

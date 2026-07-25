@@ -5,9 +5,10 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-
 Severity = Literal["low", "medium", "high", "critical"]
-IssueStatus = Literal["open", "triaged", "in_progress", "blocked", "resolved", "fixed", "accepted_risk", "ignored", "reopened"]
+IssueStatus = Literal[
+    "open", "triaged", "in_progress", "blocked", "resolved", "fixed", "accepted_risk", "ignored", "reopened"
+]
 IssueCategory = Literal[
     "completeness",
     "validity",
@@ -96,13 +97,15 @@ class ScoringContext(BaseModel):
     dataset_criticality: Literal["low", "medium", "high", "mission_critical"] = "medium"
     accepted_risk_discount: float = Field(default=0.25, ge=0, le=1)
     rule_issue_multiplier: float = Field(default=1.1, ge=0.5, le=3)
-    dimension_weights: dict[str, float] = Field(default_factory=lambda: {
-        "completeness": 0.24,
-        "validity": 0.22,
-        "consistency": 0.16,
-        "uniqueness": 0.16,
-        "reliability": 0.22,
-    })
+    dimension_weights: dict[str, float] = Field(
+        default_factory=lambda: {
+            "completeness": 0.24,
+            "validity": 0.22,
+            "consistency": 0.16,
+            "uniqueness": 0.16,
+            "reliability": 0.22,
+        }
+    )
 
 
 class QualityScore(BaseModel):
@@ -153,7 +156,19 @@ class AuditRuleConfig(BaseModel):
     stale_after_days: dict[str, int] = Field(default_factory=dict)
 
 
-RuleType = Literal["required", "unique", "email", "allowed_values", "regex", "numeric_range", "length_range", "missing_threshold", "expected_type", "stale_days", "duplicate_rows"]
+RuleType = Literal[
+    "required",
+    "unique",
+    "email",
+    "allowed_values",
+    "regex",
+    "numeric_range",
+    "length_range",
+    "missing_threshold",
+    "expected_type",
+    "stale_days",
+    "duplicate_rows",
+]
 RuleOutcome = Literal["passed", "failed", "warning", "skipped"]
 
 
@@ -216,7 +231,9 @@ class AuditResult(BaseModel):
     audit_id: str
     dataset_name: str
     created_at: datetime
-    audit_kind: Literal["dataset_import", "version_import", "rerun", "scheduled", "sample", "remediation", "audit"] = "audit"
+    audit_kind: Literal["dataset_import", "version_import", "rerun", "scheduled", "sample", "remediation", "audit"] = (
+        "audit"
+    )
     dataset_version: int | None = Field(default=None, ge=1)
     upload: UploadedFileInfo | None = None
     rule_config: AuditRuleConfig = Field(default_factory=AuditRuleConfig)
@@ -228,12 +245,11 @@ class AuditResult(BaseModel):
     summary: AuditSummary
 
 
-
-
 class ScoreRecalculationRequest(BaseModel):
     dataset_criticality: Literal["low", "medium", "high", "mission_critical"] | None = None
     accepted_risk_discount: float | None = Field(default=None, ge=0, le=1)
     rule_issue_multiplier: float | None = Field(default=None, ge=0.5, le=3)
+
 
 class AppliedRecommendation(BaseModel):
     audit_id: str

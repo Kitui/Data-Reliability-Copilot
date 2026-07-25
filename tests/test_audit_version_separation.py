@@ -13,7 +13,6 @@ def test_versioning_helper_exists_and_routes_use_lineage():
 def test_audit_result_tracks_kind_and_dataset_version():
     schemas = Path("app/schemas.py").read_text()
     audits = Path("app/api/routes/audits.py").read_text()
-    schedules = Path("app/api/routes/schedules.py").read_text()
     handlers = Path("app/jobs/handlers.py").read_text()
     assert "audit_kind:" in schemas
     assert "dataset_version:" in schemas

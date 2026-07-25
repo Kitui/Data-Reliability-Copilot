@@ -1,7 +1,8 @@
+import pandas as pd
+
 from app.auditor import audit_dataframe
 from app.schemas import QualityIssue, ScoringContext
 from app.scoring import score_audit
-import pandas as pd
 
 
 def issue(issue_id: str, severity: str, rate: float, status: str = "open", rule_id=None):
@@ -25,7 +26,9 @@ def issue(issue_id: str, severity: str, rate: float, status: str = "open", rule_
 def test_scoring_uses_severity_breadth_and_criticality():
     result = audit_dataframe(pd.DataFrame({"value": list(range(100))}), "scores.csv")
     low = score_audit(result.profile, [issue("a", "low", 0.05)], ScoringContext(dataset_criticality="low"))
-    broad = score_audit(result.profile, [issue("b", "critical", 0.8)], ScoringContext(dataset_criticality="mission_critical"))
+    broad = score_audit(
+        result.profile, [issue("b", "critical", 0.8)], ScoringContext(dataset_criticality="mission_critical")
+    )
     assert broad.overall < low.overall
     assert broad.total_weighted_penalty > low.total_weighted_penalty
     assert broad.deductions[0].reason
@@ -51,18 +54,21 @@ def test_rule_backed_findings_receive_rule_multiplier():
 
 def test_score_breakdown_and_recalculation_api():
     from fastapi.testclient import TestClient
+
     from app.main import create_app
 
     with TestClient(create_app()) as client:
-        assert client.post('/auth/login', json={'email': 'admin@drc.local', 'password': 'ChangeMe123!'}).status_code == 200
-        audit = client.post('/audits/sample').json()
+        assert (
+            client.post("/auth/login", json={"email": "admin@drc.local", "password": "ChangeMe123!"}).status_code == 200
+        )
+        audit = client.post("/audits/sample").json()
         breakdown = client.get(f"/audits/{audit['audit_id']}/score-breakdown")
         assert breakdown.status_code == 200
-        assert breakdown.json()['score']['dimension_weights']
+        assert breakdown.json()["score"]["dimension_weights"]
         recalculated = client.post(
             f"/audits/{audit['audit_id']}/score/recalculate",
-            json={'dataset_criticality': 'mission_critical'},
+            json={"dataset_criticality": "mission_critical"},
         )
         assert recalculated.status_code == 200
-        assert recalculated.json()['scoring_context']['dataset_criticality'] == 'mission_critical'
-        assert recalculated.json()['score']['dataset_criticality'] == 'mission_critical'
+        assert recalculated.json()["scoring_context"]["dataset_criticality"] == "mission_critical"
+        assert recalculated.json()["score"]["dataset_criticality"] == "mission_critical"
